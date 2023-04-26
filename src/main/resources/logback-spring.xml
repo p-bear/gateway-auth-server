@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <springProfile name="local">
+        <property name="FILE_PATH" value="/users/friendship41/workspace/logs"/>
+        <property name="FILE_NAME" value="gateway-auth-server"/>
+    </springProfile>
+
+    <springProfile name="release">
+        <property name="FILE_PATH" value="/logs"/>
+        <property name="FILE_NAME" value="gateway-auth-server"/>
+    </springProfile>
+
+
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{yyyyMMdd HH:mm:ss.SSS} [%thread] %-5level %logger{5} - %msg %n</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="RollingFileAppender" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${FILE_PATH}/${FILE_NAME}.log</file>
+
+        <encoder>
+            <pattern>%d{yyyyMMdd HH:mm:ss.SSS} [%thread] %-5level %logger{5} - %msg %n</pattern>
+        </encoder>
+
+        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+            <fileNamePattern>${FILE_PATH}/${FILE_NAME}.log.%d{yyyy-MM-dd}_%i.gz</fileNamePattern>
+            <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
+                <maxFileSize>1GB</maxFileSize>
+            </timeBasedFileNamingAndTriggeringPolicy>
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+    </appender>
+
+    <springProfile name="local">
+        <root level="INFO">
+            <appender-ref ref="STDOUT" />
+        </root>
+    </springProfile>
+
+    <springProfile name="release">
+        <root level="INFO">
+            <appender-ref ref="RollingFileAppender" />
+        </root>
+    </springProfile>
+</configuration>
