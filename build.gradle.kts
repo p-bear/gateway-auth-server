@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "com.pbear"
-version = "0.0.1-SNAPSHOT"
+version = "0.0.2"
 java.sourceCompatibility = JavaVersion.VERSION_11
 
 repositories {
@@ -18,12 +18,19 @@ repositories {
 extra["springCloudVersion"] = "2021.0.6"
 
 dependencies {
+    // spring
     implementation("org.springframework.boot:spring-boot-starter-webflux")
+    implementation("org.springframework.cloud:spring-cloud-starter-gateway")
+
+    // support
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
+
+    // kot
     implementation("io.projectreactor.kotlin:reactor-kotlin-extensions")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor")
-    implementation("org.springframework.cloud:spring-cloud-starter-gateway")
+
+    // test
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testImplementation("io.projectreactor:reactor-test")
 }
