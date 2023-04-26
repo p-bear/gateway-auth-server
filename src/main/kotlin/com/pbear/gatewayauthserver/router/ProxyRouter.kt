@@ -12,13 +12,14 @@ class ProxyRouter {
 
     @Bean
     fun proxyRouterFunction(routeLocatorBuilder: RouteLocatorBuilder): RouteLocator = routeLocatorBuilder.routes()
-        .route("all") { predicateSpec -> predicateSpec
-            .predicate {
-                var flag = true
-                log.info("qwe")
-                flag
-            }
-            .uri("http://192.168.0.103:40001")
+        .route("main") { predicateSpec ->
+            predicateSpec
+                .predicate {
+                    log.info("[${it.request.method}] ${it.request.uri}")
+                    it.request.uri.path.startsWith("/main")
+                }
+                .filters { it.rewritePath("^/main", "") }
+                .uri("http://192.168.0.103:40001")
         }
         .build()
 }
