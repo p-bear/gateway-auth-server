@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "com.pbear"
-version = "0.0.3"
+version = "0.0.4"
 java.sourceCompatibility = JavaVersion.VERSION_11
 
 repositories {
@@ -23,12 +23,14 @@ dependencies {
     implementation("org.springframework.cloud:spring-cloud-starter-gateway")
 
     // support
-    implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
+    implementation("io.netty:netty-resolver-dns-native-macos:4.1.70.Final:osx-aarch_64")
 
-    // kot
+    // kotlin
+    implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
     implementation("io.projectreactor.kotlin:reactor-kotlin-extensions")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor")
+    implementation("io.github.microutils:kotlin-logging-jvm:3.0.5")
 
     // test
     testImplementation("org.springframework.boot:spring-boot-starter-test")
