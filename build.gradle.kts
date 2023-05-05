@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "com.pbear"
-version = "0.0.5"
+version = "0.0.6"
 java.sourceCompatibility = JavaVersion.VERSION_11
 
 repositories {
@@ -21,9 +21,13 @@ dependencies {
     // spring
     implementation("org.springframework.boot:spring-boot-starter-webflux")
     implementation("org.springframework.cloud:spring-cloud-starter-gateway")
+    implementation("org.springframework.boot:spring-boot-starter-security")
+    implementation("org.springframework.boot:spring-boot-starter-data-r2dbc")
 
     // support
     implementation("io.netty:netty-resolver-dns-native-macos:4.1.70.Final:osx-aarch_64")
+    implementation("com.nimbusds:c2id-server-sdk:4.53")
+    implementation("org.mariadb:r2dbc-mariadb:1.0.3")
 
     // kotlin
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
