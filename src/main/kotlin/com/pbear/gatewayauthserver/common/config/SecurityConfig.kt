@@ -1,4 +1,4 @@
-package com.pbear.gatewayauthserver.config
+package com.pbear.gatewayauthserver.common.config
 
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration

@@ -1,4 +1,4 @@
-package com.pbear.gatewayauthserver.config
+package com.pbear.gatewayauthserver.common.config
 
 import io.r2dbc.spi.ConnectionFactories
 import io.r2dbc.spi.ConnectionFactory

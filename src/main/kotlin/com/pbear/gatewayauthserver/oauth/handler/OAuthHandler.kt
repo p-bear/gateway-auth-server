@@ -3,6 +3,7 @@ package com.pbear.gatewayauthserver.oauth.handler
 import com.nimbusds.common.contenttype.ContentType
 import com.nimbusds.oauth2.sdk.ParseException
 import com.nimbusds.oauth2.sdk.auth.ClientAuthentication
+import com.nimbusds.oauth2.sdk.auth.verifier.InvalidClientException
 import com.nimbusds.oauth2.sdk.http.HTTPRequest
 import com.nimbusds.oauth2.sdk.util.URLUtils
 import com.nimbusds.oauth2.sdk.util.X509CertificateUtils
