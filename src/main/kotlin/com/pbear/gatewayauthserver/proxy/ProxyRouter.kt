@@ -1,4 +1,4 @@
-package com.pbear.gatewayauthserver.router
+package com.pbear.gatewayauthserver.proxy
 
 import com.pbear.gatewayauthserver.auth.filter.ApiAccessControlFilter
 import mu.KotlinLogging

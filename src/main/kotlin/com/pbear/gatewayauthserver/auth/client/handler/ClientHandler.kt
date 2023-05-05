@@ -14,7 +14,8 @@ import reactor.core.publisher.Mono
 @Service
 class ClientHandler(
     private val clientDetailsRepository: ClientDetailsRepository,
-    private val passwordEncoder: PasswordEncoder) {
+    private val passwordEncoder: PasswordEncoder
+) {
     private val log = KotlinLogging.logger {  }
 
     @Value("\${client.secret.key}")

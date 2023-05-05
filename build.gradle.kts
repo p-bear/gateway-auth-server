@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "com.pbear"
-version = "0.0.6"
+version = "0.0.7"
 java.sourceCompatibility = JavaVersion.VERSION_11
 
 repositories {
