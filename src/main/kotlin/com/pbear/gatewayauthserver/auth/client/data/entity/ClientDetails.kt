@@ -18,8 +18,8 @@ data class ClientDetails(
     var scopes: String = "test:*",
     var authorities: String = "USER",
     var grantTypes: String = GrantType.PASSWORD.value,
-    var accessTokenValidity: Int = 86400,
-    var refreshTokenValidity: Int = 2592000,
+    var accessTokenValidity: Long = 86400,
+    var refreshTokenValidity: Long = 2592000,
 
     @CreatedDate
     var creDate: LocalDateTime? = null,

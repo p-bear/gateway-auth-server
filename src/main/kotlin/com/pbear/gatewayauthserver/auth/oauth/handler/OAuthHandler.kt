@@ -1,13 +1,15 @@
-package com.pbear.gatewayauthserver.oauth.handler
+package com.pbear.gatewayauthserver.auth.oauth.handler
 
 import com.nimbusds.common.contenttype.ContentType
+import com.nimbusds.oauth2.sdk.AccessTokenResponse
 import com.nimbusds.oauth2.sdk.ParseException
+import com.nimbusds.oauth2.sdk.TokenRequest
 import com.nimbusds.oauth2.sdk.auth.ClientAuthentication
-import com.nimbusds.oauth2.sdk.auth.verifier.InvalidClientException
 import com.nimbusds.oauth2.sdk.http.HTTPRequest
 import com.nimbusds.oauth2.sdk.util.URLUtils
 import com.nimbusds.oauth2.sdk.util.X509CertificateUtils
 import com.pbear.gatewayauthserver.auth.client.handler.ClientAuthenticationVerifierEncodeSupport
+import com.pbear.gatewayauthserver.auth.oauth.service.TokenService
 import mu.KotlinLogging
 import org.springframework.stereotype.Component
 import org.springframework.util.MultiValueMap
@@ -20,18 +22,22 @@ import java.util.stream.Collectors
 
 @Component
 class OAuthHandler(
-    private val clientAuthenticationVerifierEncodeSupport: ClientAuthenticationVerifierEncodeSupport
+    private val clientAuthenticationVerifierEncodeSupport: ClientAuthenticationVerifierEncodeSupport,
+    private val tokenService: TokenService
 ) {
     private val log = KotlinLogging.logger {  }
 
     fun handleOauthToken(serverRequest: ServerRequest): Mono<ServerResponse> {
         return serverRequest.formData()
             .map { this.mapToHTTPRequest(serverRequest, it, null) }
-            .map { this.clientAuthenticationVerifierEncodeSupport.verify(ClientAuthentication.parse(it), null, null) }
-            .flatMap{
-                log.info(it.toString())
-                ServerResponse.ok().build()
+            .map { TokenRequest.parse(it) }
+            .doOnNext {
+
             }
+            .zipWhen { Mono.just(ClientAuthentication.parse(it.toHTTPRequest())) }
+            .doOnNext { this.clientAuthenticationVerifierEncodeSupport.verify(it.t2, null, null) }
+            .flatMap { this.tokenService.getToken(it.t1, it.t2) }
+            .flatMap{ ServerResponse.ok().bodyValue(AccessTokenResponse.parse(it.toJSONObject()).toJSONObject()) }
     }
 
     private fun <T> mapToHTTPRequest(serverRequest: ServerRequest, formData: MultiValueMap<String, String>?, body: T?): HTTPRequest {

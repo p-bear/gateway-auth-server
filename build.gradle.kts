@@ -5,10 +5,11 @@ plugins {
     id("io.spring.dependency-management") version "1.0.15.RELEASE"
     kotlin("jvm") version "1.6.21"
     kotlin("plugin.spring") version "1.6.21"
+    id("org.jetbrains.kotlin.plugin.noarg") version "1.8.20"
 }
 
 group = "com.pbear"
-version = "0.0.9"
+version = "0.0.10"
 java.sourceCompatibility = JavaVersion.VERSION_11
 
 repositories {
@@ -46,6 +47,10 @@ dependencyManagement {
     imports {
         mavenBom("org.springframework.cloud:spring-cloud-dependencies:${property("springCloudVersion")}")
     }
+}
+
+noArg {
+    annotation("com.pbear.gatewayauthserver.common.config.NoArg")
 }
 
 tasks.withType<KotlinCompile> {

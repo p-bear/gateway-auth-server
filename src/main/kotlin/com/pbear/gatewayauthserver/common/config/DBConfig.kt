@@ -1,5 +1,7 @@
 package com.pbear.gatewayauthserver.common.config
 
+import com.pbear.gatewayauthserver.auth.oauth.data.entity.AccessTokenRedis
+import com.pbear.gatewayauthserver.auth.oauth.data.entity.RefreshTokenRedis
 import io.r2dbc.spi.ConnectionFactories
 import io.r2dbc.spi.ConnectionFactory
 import io.r2dbc.spi.ConnectionFactoryOptions
@@ -22,7 +24,9 @@ import org.springframework.data.redis.connection.ReactiveRedisConnectionFactory
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory
 import org.springframework.data.redis.core.ReactiveRedisOperations
 import org.springframework.data.redis.core.ReactiveRedisTemplate
+import org.springframework.data.redis.serializer.Jackson2JsonRedisSerializer
 import org.springframework.data.redis.serializer.RedisSerializationContext
+import org.springframework.data.redis.serializer.RedisSerializationContext.RedisSerializationContextBuilder
 import org.springframework.data.redis.serializer.RedisSerializer
 import org.springframework.data.redis.serializer.StringRedisSerializer
 import org.springframework.r2dbc.core.DatabaseClient
@@ -107,5 +111,27 @@ class BasicRedisConfig {
             .hashValue(serializer)
             .build()
         return ReactiveRedisTemplate(factory, serializationContext)
+    }
+
+    @Bean
+    @Qualifier("AccessTokenReactiveRedisTemplate")
+    fun accessTokenReactiveRedisTemplate(factory: ReactiveRedisConnectionFactory): ReactiveRedisTemplate<String, AccessTokenRedis> {
+        val keySerializer = StringRedisSerializer()
+        val valueSerializer = Jackson2JsonRedisSerializer(AccessTokenRedis::class.java)
+        val builder: RedisSerializationContextBuilder<String, AccessTokenRedis> =
+            RedisSerializationContext.newSerializationContext(keySerializer)
+        val context: RedisSerializationContext<String, AccessTokenRedis> = builder.value(valueSerializer).build()
+        return ReactiveRedisTemplate(factory, context)
+    }
+
+    @Bean
+    @Qualifier("refreshTokenReactiveRedisTemplate")
+    fun refreshTokenReactiveRedisTemplate(factory: ReactiveRedisConnectionFactory): ReactiveRedisTemplate<String, RefreshTokenRedis> {
+        val keySerializer = StringRedisSerializer()
+        val valueSerializer = Jackson2JsonRedisSerializer(RefreshTokenRedis::class.java)
+        val builder: RedisSerializationContextBuilder<String, RefreshTokenRedis> =
+            RedisSerializationContext.newSerializationContext(keySerializer)
+        val context: RedisSerializationContext<String, RefreshTokenRedis> = builder.value(valueSerializer).build()
+        return ReactiveRedisTemplate(factory, context)
     }
 }
