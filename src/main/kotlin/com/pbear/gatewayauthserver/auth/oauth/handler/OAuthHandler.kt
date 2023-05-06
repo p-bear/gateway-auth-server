@@ -31,9 +31,6 @@ class OAuthHandler(
         return serverRequest.formData()
             .map { this.mapToHTTPRequest(serverRequest, it, null) }
             .map { TokenRequest.parse(it) }
-            .doOnNext {
-
-            }
             .zipWhen { Mono.just(ClientAuthentication.parse(it.toHTTPRequest())) }
             .doOnNext { this.clientAuthenticationVerifierEncodeSupport.verify(it.t2, null, null) }
             .flatMap { this.tokenService.getToken(it.t1, it.t2) }

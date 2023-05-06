@@ -9,14 +9,18 @@ data class AccessTokenRedis(
     val issueTime: Long = Date().time,
     val clientId: String,
     val clientAuthenticationMethod: String,
+    val accessTokenValidity: Long,
     val scopes: String,
     val authorities: String,
-    val grantType: String
+    val grantType: String,
+    val accountId: Long,
+    val refreshToken: String
 )
 
 @NoArg
 data class RefreshTokenRedis(
     val value: String,
     val clientId: String,
-    val clientAuthenticationMethod: String
+    val clientAuthenticationMethod: String,
+    val accountId: Long
 )
