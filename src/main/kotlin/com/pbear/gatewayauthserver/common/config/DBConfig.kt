@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.context.annotation.Primary
 import org.springframework.data.auditing.ReactiveIsNewAwareAuditingHandler
 import org.springframework.data.mapping.context.PersistentEntities
 import org.springframework.data.r2dbc.config.EnableR2dbcAuditing
@@ -17,6 +18,13 @@ import org.springframework.data.r2dbc.core.R2dbcEntityTemplate
 import org.springframework.data.r2dbc.dialect.MySqlDialect
 import org.springframework.data.r2dbc.mapping.R2dbcMappingContext
 import org.springframework.data.r2dbc.repository.config.EnableR2dbcRepositories
+import org.springframework.data.redis.connection.ReactiveRedisConnectionFactory
+import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory
+import org.springframework.data.redis.core.ReactiveRedisOperations
+import org.springframework.data.redis.core.ReactiveRedisTemplate
+import org.springframework.data.redis.serializer.RedisSerializationContext
+import org.springframework.data.redis.serializer.RedisSerializer
+import org.springframework.data.redis.serializer.StringRedisSerializer
 import org.springframework.r2dbc.core.DatabaseClient
 
 @Configuration
@@ -76,4 +84,28 @@ class R2dbcMainDBConfig {
                 .build(),
             DefaultReactiveDataAccessStrategy(MySqlDialect.INSTANCE)
         )
+}
+
+
+@Configuration
+class BasicRedisConfig {
+    @Primary
+    @Bean
+    fun reactiveRedisConnectionFactory(): ReactiveRedisConnectionFactory {
+        return LettuceConnectionFactory("192.168.0.103", 6379)
+    }
+
+    @Primary
+    @Bean
+    fun reactiveRedisOperations(factory: ReactiveRedisConnectionFactory): ReactiveRedisOperations<String, String> {
+        val serializer: RedisSerializer<String> = StringRedisSerializer()
+        val serializationContext = RedisSerializationContext
+            .newSerializationContext<String, String>()
+            .key(serializer)
+            .value(serializer)
+            .hashKey(serializer)
+            .hashValue(serializer)
+            .build()
+        return ReactiveRedisTemplate(factory, serializationContext)
+    }
 }

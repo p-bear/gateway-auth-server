@@ -8,7 +8,7 @@ plugins {
 }
 
 group = "com.pbear"
-version = "0.0.8"
+version = "0.0.9"
 java.sourceCompatibility = JavaVersion.VERSION_11
 
 repositories {
@@ -23,6 +23,7 @@ dependencies {
     implementation("org.springframework.cloud:spring-cloud-starter-gateway")
     implementation("org.springframework.boot:spring-boot-starter-security")
     implementation("org.springframework.boot:spring-boot-starter-data-r2dbc")
+    implementation("org.springframework.boot:spring-boot-starter-data-redis-reactive")
 
     // support
     implementation("io.netty:netty-resolver-dns-native-macos:4.1.70.Final:osx-aarch_64")
