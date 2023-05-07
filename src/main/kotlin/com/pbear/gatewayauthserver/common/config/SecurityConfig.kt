@@ -43,9 +43,13 @@ class SecurityConfig {
 
         return serverHttpSecurity
             .authorizeExchange()
+            // main 서버 기본 scope -> main:*
             .pathMatchers("/main/**").hasAuthority("SCOPE_main:*")
+
+            // client 및 user insert 관련 permit ALl
             .pathMatchers("/oauth/client").permitAll()
             .pathMatchers(HttpMethod.POST, "/oauth/token").permitAll()
+            .pathMatchers(HttpMethod.POST, "/main/api/account").permitAll()
 
             .and()
             .addFilterAfter(filter, SecurityWebFiltersOrder.AUTHENTICATION)
