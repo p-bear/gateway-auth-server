@@ -25,6 +25,9 @@ import org.springframework.security.web.server.SecurityWebFilterChain
 import org.springframework.security.web.server.authentication.AuthenticationWebFilter
 import org.springframework.security.web.server.authentication.ServerAuthenticationConverter
 import org.springframework.stereotype.Component
+import org.springframework.web.cors.CorsConfiguration
+import org.springframework.web.cors.reactive.CorsConfigurationSource
+import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource
 import org.springframework.web.server.ResponseStatusException
 import org.springframework.web.server.ServerWebExchange
 import reactor.core.publisher.Mono
@@ -58,8 +61,21 @@ class SecurityConfig {
             .formLogin().disable()
             .httpBasic().disable()
             .logout().disable()
-            .cors().disable()
+            .cors().configurationSource(corsConfigurationSource())
+            .and()
             .build()
+    }
+
+    @Bean
+    fun corsConfigurationSource(): CorsConfigurationSource {
+        val config = CorsConfiguration()
+        config.addAllowedOrigin("*")
+        config.addAllowedHeader("*")
+        config.addAllowedMethod("*")
+
+        val configSource = UrlBasedCorsConfigurationSource()
+        configSource.registerCorsConfiguration("/**", config)
+        return configSource
     }
 
     @Bean
@@ -92,6 +108,9 @@ class SecurityConfig {
 @Component
 class AuthManager(private val userDetailsService: ReactiveUserDetailsService): ReactiveAuthenticationManager {
     override fun authenticate(authentication: Authentication): Mono<Authentication> {
+        if (authentication.isAuthenticated) {
+            return Mono.just(authentication)
+        }
         return this.userDetailsService.findByUsername(authentication.name)
             .map {
                 UsernamePasswordAuthenticationToken(it.username, it.password, it.authorities)
@@ -102,6 +121,9 @@ class AuthManager(private val userDetailsService: ReactiveUserDetailsService): R
 @Component
 class AuthenticationConverter: ServerAuthenticationConverter {
     override fun convert(exchange: ServerWebExchange): Mono<Authentication> {
+        if (exchange.request.uri.path.equals("/oauth/token")) {
+            return Mono.just(UsernamePasswordAuthenticationToken.authenticated(null, null, null))
+        }
         val token = exchange.request.headers.getFirst(HttpHeaders.AUTHORIZATION)
         val accessToken = BearerAccessToken.parse(token, AccessTokenType.BEARER)
         return Mono.just(UsernamePasswordAuthenticationToken.unauthenticated(TokenPrincipal(accessToken), accessToken))
