@@ -37,9 +37,21 @@ class TokenService(
     private val webClient: WebClient
 ) {
     companion object {
-        const val ACCESS_TOKEN_PREFIX = "accessToken"
-        const val CLIENT_ID_METHOD_ACCOUNT_ID_PREFIX = "clientIdMethodAccountId"
-        const val REFRESH_TOKEN_PREFIX = "refreshToken"
+        private const val ACCESS_TOKEN_PREFIX = "accessToken"
+        private const val CLIENT_ID_METHOD_ACCOUNT_ID_PREFIX = "clientIdMethodAccountId"
+        private const val REFRESH_TOKEN_PREFIX = "refreshToken"
+
+        fun getAccessTokenKey(accessTokenValue: String): String {
+            return "${ACCESS_TOKEN_PREFIX}_${accessTokenValue}"
+        }
+
+        fun getClientIdMethodAccountIdKey(clientId: String, clientAuthenticationMethod: String, accountId: Long): String {
+            return "${CLIENT_ID_METHOD_ACCOUNT_ID_PREFIX}_${clientId}_${clientAuthenticationMethod}_${accountId}"
+        }
+
+        fun getRefreshTokenKey(refreshTokenValue: String): String {
+            return "${REFRESH_TOKEN_PREFIX}_${refreshTokenValue}"
+        }
     }
 
     @Value("\${webclient.config.main.baseurl}")
@@ -62,7 +74,7 @@ class TokenService(
                             )
                         } else {
                             this.accessTokenRedisTemplate.opsForValue()
-                                .get("${ACCESS_TOKEN_PREFIX}_${it.t2}")
+                                .get(getAccessTokenKey(it.t2))
                                 .map { tokenDB ->
                                     Tokens(
                                         BearerAccessToken(
@@ -96,12 +108,12 @@ class TokenService(
     }
 
     fun checkTokenExist(clientId: String, clientAuthenticationMethod: String, accountId: Long): Mono<String> {
-        return this.reactiveRedisTemplate.hasKey("${CLIENT_ID_METHOD_ACCOUNT_ID_PREFIX}_${clientId}_${clientAuthenticationMethod}_${accountId}")
+        return this.reactiveRedisTemplate.hasKey(getClientIdMethodAccountIdKey(clientId, clientAuthenticationMethod, accountId))
             .flatMap {
                 if (it) {
                     this.reactiveRedisTemplate
                         .opsForValue()
-                        .get("${CLIENT_ID_METHOD_ACCOUNT_ID_PREFIX}_${clientId}_${clientAuthenticationMethod}_${accountId}")
+                        .get(getClientIdMethodAccountIdKey(clientId, clientAuthenticationMethod, accountId))
                 } else {
                     Mono.just("")
                 }
@@ -118,7 +130,7 @@ class TokenService(
             .zipWhen {
                 this.accessTokenRedisTemplate.opsForValue()
                     .set(
-                        "${ACCESS_TOKEN_PREFIX}_${accessTokenValue}",
+                        getAccessTokenKey(accessTokenValue),
                         AccessTokenRedis(
                             value = accessTokenValue,
                             clientId = it.clientId,
@@ -137,7 +149,8 @@ class TokenService(
             }
             .zipWhen {
                 this.reactiveRedisTemplate.opsForValue()
-                    .set("${CLIENT_ID_METHOD_ACCOUNT_ID_PREFIX}_${clientId}_${clientAuthenticationMethod}_${accountId}",
+                    .set(
+                        getClientIdMethodAccountIdKey(clientId, clientAuthenticationMethod, accountId),
                         accessTokenValue,
                         Duration.ofSeconds(it.accessTokenValidity))
             }
@@ -151,7 +164,7 @@ class TokenService(
             }
             .zipWhen {
                 this.refreshTokenRedisTemplate.opsForValue()
-                    .set("${REFRESH_TOKEN_PREFIX}_${refreshTokenValue}",
+                    .set(getRefreshTokenKey(refreshTokenValue),
                         RefreshTokenRedis(refreshTokenValue, it.clientId, it.clientAuthenticationMethod, accountId),
                         Duration.ofSeconds(it.refreshTokenValidity))
             }
@@ -159,7 +172,7 @@ class TokenService(
             .map {
                 if (!it.t2) {
                     this.accessTokenRedisTemplate.delete(accessTokenValue).toFuture().get()
-                    this.reactiveRedisTemplate.delete("${CLIENT_ID_METHOD_ACCOUNT_ID_PREFIX}_${clientId}_${clientAuthenticationMethod}_${accountId}").toFuture().get()
+                    this.reactiveRedisTemplate.delete(getClientIdMethodAccountIdKey(clientId, clientAuthenticationMethod, accountId)).toFuture().get()
                     throw ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "fail to save accessToken")
                 }
                 it.t1
@@ -172,5 +185,10 @@ class TokenService(
                         Scope.parse(it.scopes)),
                     RefreshToken(refreshTokenValue))
             }
+    }
+
+    fun checkAccessTokenExist(accessToken: String): Mono<AccessTokenRedis> {
+        return this.accessTokenRedisTemplate.opsForValue()
+            .get(getAccessTokenKey(accessToken))
     }
 }
