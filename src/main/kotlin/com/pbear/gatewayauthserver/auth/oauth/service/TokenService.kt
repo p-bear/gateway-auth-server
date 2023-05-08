@@ -1,6 +1,7 @@
 package com.pbear.gatewayauthserver.auth.oauth.service
 
 import com.nimbusds.oauth2.sdk.GrantType
+import com.nimbusds.oauth2.sdk.RefreshTokenGrant
 import com.nimbusds.oauth2.sdk.ResourceOwnerPasswordCredentialsGrant
 import com.nimbusds.oauth2.sdk.Scope
 import com.nimbusds.oauth2.sdk.TokenRequest
@@ -8,6 +9,7 @@ import com.nimbusds.oauth2.sdk.auth.ClientAuthentication
 import com.nimbusds.oauth2.sdk.token.BearerAccessToken
 import com.nimbusds.oauth2.sdk.token.RefreshToken
 import com.nimbusds.oauth2.sdk.token.Tokens
+import com.pbear.gatewayauthserver.auth.client.data.entity.ClientDetails
 import com.pbear.gatewayauthserver.auth.client.repository.ClientDetailsRepository
 import com.pbear.gatewayauthserver.auth.oauth.data.entity.AccessTokenRedis
 import com.pbear.gatewayauthserver.auth.oauth.data.entity.RefreshTokenRedis
@@ -67,26 +69,19 @@ class TokenService(
                     }
                     .flatMap {
                         if (it.t2.isEmpty()) {
-                            this.createAndSaveToken(
-                                clientAuthentication.clientID.value,
-                                clientAuthentication.method.value,
-                                (it.t1["id"] as Int).toLong()
-                            )
+                            this.createAndSaveToken(clientAuthentication.clientID.value, clientAuthentication.method.value, (it.t1["id"] as Int).toLong())
                         } else {
-                            this.accessTokenRedisTemplate.opsForValue()
-                                .get(getAccessTokenKey(it.t2))
-                                .map { tokenDB ->
-                                    Tokens(
-                                        BearerAccessToken(
-                                            tokenDB.value,
-                                            (tokenDB.issueTime + (tokenDB.accessTokenValidity * 1000) - Date().time) / 1000,
-                                            Scope.parse(tokenDB.scopes)),
-                                        RefreshToken(tokenDB.refreshToken))
-                                }
+                            getAccessToken(it.t2)
                         }
                     }
             }
-            GrantType.REFRESH_TOKEN -> Mono.just(Tokens(BearerAccessToken(), RefreshToken()))
+            GrantType.REFRESH_TOKEN -> {
+                val reqBodyGrant = tokenRequest.authorizationGrant as RefreshTokenGrant
+                this.refreshToken(
+                    clientAuthentication.clientID.value,
+                    clientAuthentication.method.value,
+                    reqBodyGrant.refreshToken.value)
+            }
             else -> throw ResponseStatusException(HttpStatus.BAD_REQUEST, "grantType not supported, grantType: ${tokenRequest.authorizationGrant.type.value}")
         }
     }
@@ -127,56 +122,9 @@ class TokenService(
         return this.clientDetailsRepository
             .findByClientIdAndClientAuthenticationMethod(clientId, clientAuthenticationMethod)
             .switchIfEmpty { throw ResponseStatusException(HttpStatus.BAD_REQUEST, "cannot find clientId: $clientId") }
-            .zipWhen {
-                this.accessTokenRedisTemplate.opsForValue()
-                    .set(
-                        getAccessTokenKey(accessTokenValue),
-                        AccessTokenRedis(
-                            value = accessTokenValue,
-                            clientId = it.clientId,
-                            clientAuthenticationMethod = it.clientAuthenticationMethod,
-                            accessTokenValidity = it.accessTokenValidity,
-                            scopes = it.scopes,
-                            authorities = it.authorities,
-                            grantType = it.grantTypes,
-                            accountId = accountId,
-                            refreshToken = refreshTokenValue),
-                        Duration.ofSeconds(it.accessTokenValidity))
-            }
-            .map {
-                if (!it.t2) throw ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "fail to save accessToken")
-                it.t1
-            }
-            .zipWhen {
-                this.reactiveRedisTemplate.opsForValue()
-                    .set(
-                        getClientIdMethodAccountIdKey(clientId, clientAuthenticationMethod, accountId),
-                        accessTokenValue,
-                        Duration.ofSeconds(it.accessTokenValidity))
-            }
-            .publishOn(Schedulers.boundedElastic())
-            .map {
-                if (!it.t2) {
-                    this.accessTokenRedisTemplate.delete(accessTokenValue).toFuture().get()
-                    throw ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "fail to save clientIdAccountId")
-                }
-                it.t1
-            }
-            .zipWhen {
-                this.refreshTokenRedisTemplate.opsForValue()
-                    .set(getRefreshTokenKey(refreshTokenValue),
-                        RefreshTokenRedis(refreshTokenValue, it.clientId, it.clientAuthenticationMethod, accountId),
-                        Duration.ofSeconds(it.refreshTokenValidity))
-            }
-            .publishOn(Schedulers.boundedElastic())
-            .map {
-                if (!it.t2) {
-                    this.accessTokenRedisTemplate.delete(accessTokenValue).toFuture().get()
-                    this.reactiveRedisTemplate.delete(getClientIdMethodAccountIdKey(clientId, clientAuthenticationMethod, accountId)).toFuture().get()
-                    throw ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "fail to save accessToken")
-                }
-                it.t1
-            }
+            .flatMap { this.saveAccessToken(it, accessTokenValue, accountId, refreshTokenValue) }
+            .flatMap { this.saveAccountTokenMapping(it, accessTokenValue, accountId) }
+            .flatMap { this.saveRefreshToken(it, accessTokenValue, refreshTokenValue, accountId) }
             .map {
                 Tokens(
                     BearerAccessToken(
@@ -184,6 +132,117 @@ class TokenService(
                         it.accessTokenValidity,
                         Scope.parse(it.scopes)),
                     RefreshToken(refreshTokenValue))
+            }
+    }
+
+    fun getAccessToken(accessTokenValue: String): Mono<Tokens> {
+        return this.accessTokenRedisTemplate.opsForValue()
+            .get(getAccessTokenKey(accessTokenValue))
+            .map { tokenDB ->
+                Tokens(
+                    BearerAccessToken(
+                        tokenDB.value,
+                        (tokenDB.issueTime + (tokenDB.accessTokenValidity * 1000) - Date().time) / 1000,
+                        Scope.parse(tokenDB.scopes)),
+                    RefreshToken(tokenDB.refreshToken))
+            }
+    }
+
+    fun saveAccessToken(clientDetails: ClientDetails, accessTokenValue: String, accountId: Long, refreshTokenValue: String): Mono<ClientDetails> {
+        return this.accessTokenRedisTemplate.opsForValue()
+            .set(
+                getAccessTokenKey(accessTokenValue),
+                AccessTokenRedis(accessTokenValue, clientDetails, accountId, refreshTokenValue),
+                Duration.ofSeconds(clientDetails.accessTokenValidity))
+            .handle { it, sink ->
+                if (!it) {
+                    sink.error(ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "fail to save accessToken"))
+                    return@handle
+                }
+                sink.next(clientDetails)
+            }
+    }
+
+    fun saveAccountTokenMapping(clientDetails: ClientDetails, accessTokenValue: String, accountId: Long): Mono<ClientDetails> {
+        return this.reactiveRedisTemplate.opsForValue()
+            .set(
+                getClientIdMethodAccountIdKey(clientDetails.clientId, clientDetails.clientAuthenticationMethod, accountId),
+                accessTokenValue,
+                Duration.ofSeconds(clientDetails.accessTokenValidity))
+            .publishOn(Schedulers.boundedElastic())
+            .handle { it, sink ->
+                if (!it) {
+                    this.accessTokenRedisTemplate.delete(accessTokenValue).toFuture().get()
+                    sink.error(
+                        ResponseStatusException(
+                            HttpStatus.INTERNAL_SERVER_ERROR,
+                            "fail to save clientIdAccountId"
+                        )
+                    )
+                    return@handle
+                }
+                sink.next(clientDetails)
+            }
+    }
+
+    fun saveRefreshToken(clientDetails: ClientDetails, accessTokenValue: String, refreshTokenValue: String, accountId: Long): Mono<ClientDetails> {
+        return this.refreshTokenRedisTemplate.opsForValue()
+            .set(getRefreshTokenKey(refreshTokenValue),
+                RefreshTokenRedis(refreshTokenValue, clientDetails.clientId, clientDetails.clientAuthenticationMethod, accountId, accessTokenValue),
+                Duration.ofSeconds(clientDetails.refreshTokenValidity))
+            .publishOn(Schedulers.boundedElastic())
+            .handle { it, sink ->
+                if (!it) {
+                    this.accessTokenRedisTemplate.delete(accessTokenValue).toFuture().get()
+                    this.reactiveRedisTemplate.delete(
+                        getClientIdMethodAccountIdKey(
+                            clientDetails.clientId,
+                            clientDetails.clientAuthenticationMethod,
+                            accountId
+                        )
+                    ).toFuture().get()
+                    sink.error(ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "fail to save accessToken"))
+                    return@handle
+                }
+                sink.next(clientDetails)
+            }
+
+    }
+
+    fun refreshToken(clientId: String, clientAuthenticationMethod: String, refreshTokenValue: String): Mono<Tokens> {
+        return this.clientDetailsRepository.findByClientIdAndClientAuthenticationMethod(clientId, clientAuthenticationMethod)
+            .switchIfEmpty { throw ResponseStatusException(HttpStatus.BAD_REQUEST, "fail to get ClientInfo") }
+            .flatMap { clientDetails ->
+                this.refreshTokenRedisTemplate.opsForValue()
+                    .get(getRefreshTokenKey(refreshTokenValue))
+                    .switchIfEmpty { throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "invalid refreshToken") }
+                    .flatMap { refreshToken ->
+                        val accessTokenValue = UUID.randomUUID().toString()
+                        val accountId = refreshToken.accountId
+                        this.checkAccessTokenExist(refreshToken.accessToken)
+                            .defaultIfEmpty(AccessTokenRedis(accessTokenValue, clientDetails, accountId, refreshTokenValue))
+                            .flatMap {
+                                if (it.value == accessTokenValue) {
+                                    this.accessTokenRedisTemplate.opsForValue()
+                                        .set(getAccessTokenKey(accessTokenValue), it, Duration.ofSeconds(clientDetails.accessTokenValidity))
+                                } else {
+                                    this.accessTokenRedisTemplate.opsForValue()
+                                        .delete(getAccessTokenKey(it.value))
+                                        .flatMap {
+                                            this.accessTokenRedisTemplate.opsForValue()
+                                                .set(getAccessTokenKey(accessTokenValue), AccessTokenRedis(accessTokenValue, clientDetails, accountId, refreshTokenValue), Duration.ofSeconds(clientDetails.accessTokenValidity))
+                                        }
+                                }
+                            }
+                            .map {
+                                Tokens(
+                                    BearerAccessToken(
+                                        accessTokenValue,
+                                        clientDetails.accessTokenValidity,
+                                        Scope.parse(clientDetails.scopes)),
+                                    RefreshToken(refreshTokenValue))
+                            }
+                    }
             }
     }
 

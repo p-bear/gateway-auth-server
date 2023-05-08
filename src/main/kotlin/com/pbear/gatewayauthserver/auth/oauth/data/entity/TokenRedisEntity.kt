@@ -1,5 +1,6 @@
 package com.pbear.gatewayauthserver.auth.oauth.data.entity
 
+import com.pbear.gatewayauthserver.auth.client.data.entity.ClientDetails
 import com.pbear.gatewayauthserver.common.config.NoArg
 import java.util.Date
 
@@ -15,12 +16,25 @@ data class AccessTokenRedis(
     val grantType: String,
     val accountId: Long,
     val refreshToken: String
-)
+) {
+    constructor(accessTokenValue: String, clientDetails: ClientDetails, accountId: Long, refreshTokenValue: String): this(
+        value = accessTokenValue,
+        clientId = clientDetails.clientId,
+        clientAuthenticationMethod = clientDetails.clientAuthenticationMethod,
+        accessTokenValidity = clientDetails.accessTokenValidity,
+        scopes = clientDetails.scopes,
+        authorities = clientDetails.authorities,
+        grantType = clientDetails.grantTypes,
+        accountId = accountId,
+        refreshToken = refreshTokenValue
+    )
+}
 
 @NoArg
 data class RefreshTokenRedis(
     val value: String,
     val clientId: String,
     val clientAuthenticationMethod: String,
-    val accountId: Long
+    val accountId: Long,
+    val accessToken: String
 )

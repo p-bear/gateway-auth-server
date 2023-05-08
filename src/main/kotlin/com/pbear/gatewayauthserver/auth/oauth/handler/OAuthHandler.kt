@@ -2,6 +2,7 @@ package com.pbear.gatewayauthserver.auth.oauth.handler
 
 import com.nimbusds.common.contenttype.ContentType
 import com.nimbusds.oauth2.sdk.AccessTokenResponse
+import com.nimbusds.oauth2.sdk.GrantType
 import com.nimbusds.oauth2.sdk.ParseException
 import com.nimbusds.oauth2.sdk.TokenRequest
 import com.nimbusds.oauth2.sdk.auth.ClientAuthentication
@@ -11,10 +12,12 @@ import com.nimbusds.oauth2.sdk.util.X509CertificateUtils
 import com.pbear.gatewayauthserver.auth.client.handler.ClientAuthenticationVerifierEncodeSupport
 import com.pbear.gatewayauthserver.auth.oauth.service.TokenService
 import mu.KotlinLogging
+import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Component
 import org.springframework.util.MultiValueMap
 import org.springframework.web.reactive.function.server.ServerRequest
 import org.springframework.web.reactive.function.server.ServerResponse
+import org.springframework.web.server.ResponseStatusException
 import reactor.core.publisher.Mono
 import java.net.URL
 import java.security.cert.X509Certificate
@@ -33,7 +36,12 @@ class OAuthHandler(
             .map { TokenRequest.parse(it) }
             .zipWhen { Mono.just(ClientAuthentication.parse(it.toHTTPRequest())) }
             .doOnNext { this.clientAuthenticationVerifierEncodeSupport.verify(it.t2, null, null) }
-            .flatMap { this.tokenService.getToken(it.t1, it.t2) }
+            .flatMap {
+                when (it.t1.authorizationGrant.type) {
+                    GrantType.PASSWORD, GrantType.REFRESH_TOKEN -> this.tokenService.getToken(it.t1, it.t2)
+                    else -> throw ResponseStatusException(HttpStatus.BAD_REQUEST, "grantType not supported, grantType: ${it.t1.authorizationGrant.type.value}")
+                }
+            }
             .flatMap{ ServerResponse.ok().bodyValue(AccessTokenResponse.parse(it.toJSONObject()).toJSONObject()) }
     }
 
