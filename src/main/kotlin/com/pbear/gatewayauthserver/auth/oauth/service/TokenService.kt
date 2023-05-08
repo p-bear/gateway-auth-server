@@ -223,14 +223,24 @@ class TokenService(
                             .defaultIfEmpty(AccessTokenRedis(accessTokenValue, clientDetails, accountId, refreshTokenValue))
                             .flatMap {
                                 if (it.value == accessTokenValue) {
-                                    this.accessTokenRedisTemplate.opsForValue()
-                                        .set(getAccessTokenKey(accessTokenValue), it, Duration.ofSeconds(clientDetails.accessTokenValidity))
+                                    // accessToken 없음
+                                    this.saveAccessToken(clientDetails, accessTokenValue, accountId, refreshTokenValue)
+                                        .flatMap {
+                                            this.saveAccountTokenMapping(clientDetails, accessTokenValue, accountId)
+                                        }
                                 } else {
+                                    // accessToken 있음
                                     this.accessTokenRedisTemplate.opsForValue()
                                         .delete(getAccessTokenKey(it.value))
                                         .flatMap {
                                             this.accessTokenRedisTemplate.opsForValue()
-                                                .set(getAccessTokenKey(accessTokenValue), AccessTokenRedis(accessTokenValue, clientDetails, accountId, refreshTokenValue), Duration.ofSeconds(clientDetails.accessTokenValidity))
+                                                .delete(getClientIdMethodAccountIdKey(clientId, clientAuthenticationMethod, accountId))
+                                        }
+                                        .flatMap {
+                                            this.saveAccessToken(clientDetails, accessTokenValue, accountId, refreshTokenValue)
+                                        }
+                                        .flatMap {
+                                            this.saveAccountTokenMapping(clientDetails, accessTokenValue, accountId)
                                         }
                                 }
                             }

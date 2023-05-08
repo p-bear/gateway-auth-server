@@ -36,6 +36,15 @@ import java.security.Principal
 
 @Configuration
 class SecurityConfig {
+    companion object {
+        private val permitAllApiMap = mapOf(
+            HttpMethod.GET to listOf("/oauth/client"),
+            HttpMethod.POST to listOf("/oauth/client", "/oauth/token", "/main/api/account"),
+            HttpMethod.PUT to listOf("/oauth/client"),
+            HttpMethod.DELETE to listOf("/oauth/client")
+        )
+    }
+
     @Bean
     fun securityWebFilterChain(
         serverHttpSecurity: ServerHttpSecurity,
@@ -44,16 +53,19 @@ class SecurityConfig {
         val filter = AuthenticationWebFilter(authManager)
         filter.setServerAuthenticationConverter(authenticationConverter)
 
-        return serverHttpSecurity
+        val authorizeExchangeSpec = serverHttpSecurity
             .authorizeExchange()
             // main 서버 기본 scope -> main:*
             .pathMatchers("/main/**").hasAuthority("SCOPE_main:*")
 
-            // client 및 user insert 관련 permit ALl
-            .pathMatchers("/oauth/client").permitAll()
-            .pathMatchers(HttpMethod.POST, "/oauth/token").permitAll()
-            .pathMatchers(HttpMethod.POST, "/main/api/account").permitAll()
+        // permitAll 세팅
+        permitAllApiMap.forEach{ entry ->
+            entry.value.forEach { uri ->
+                authorizeExchangeSpec.pathMatchers(entry.key, uri).permitAll()
+            }
+        }
 
+        return authorizeExchangeSpec
             .and()
             .addFilterAfter(filter, SecurityWebFiltersOrder.AUTHENTICATION)
 
