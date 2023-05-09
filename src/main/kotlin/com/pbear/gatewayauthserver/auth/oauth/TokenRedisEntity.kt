@@ -1,6 +1,6 @@
-package com.pbear.gatewayauthserver.auth.oauth.data.entity
+package com.pbear.gatewayauthserver.auth.oauth
 
-import com.pbear.gatewayauthserver.auth.client.data.entity.ClientDetails
+import com.pbear.gatewayauthserver.auth.client.ClientDetails
 import com.pbear.gatewayauthserver.common.config.NoArg
 import java.util.Date
 
@@ -36,5 +36,6 @@ data class RefreshTokenRedis(
     val clientId: String,
     val clientAuthenticationMethod: String,
     val accountId: Long,
-    val accessToken: String
+    val accessToken: String,
+    val refreshTokenValidity: Long
 )

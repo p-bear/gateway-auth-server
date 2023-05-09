@@ -4,7 +4,7 @@ import com.nimbusds.oauth2.sdk.Scope
 import com.nimbusds.oauth2.sdk.token.AccessToken
 import com.nimbusds.oauth2.sdk.token.AccessTokenType
 import com.nimbusds.oauth2.sdk.token.BearerAccessToken
-import com.pbear.gatewayauthserver.auth.oauth.service.TokenService
+import com.pbear.gatewayauthserver.auth.oauth.TokenStore
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.http.HttpHeaders
@@ -38,7 +38,7 @@ import java.security.Principal
 class SecurityConfig {
     companion object {
         private val permitAllApiMap = mapOf(
-            HttpMethod.GET to listOf("/oauth/client"),
+            HttpMethod.GET to listOf("/oauth/client", "/authorize"),
             HttpMethod.POST to listOf("/oauth/client", "/oauth/token", "/main/api/account"),
             HttpMethod.PUT to listOf("/oauth/client"),
             HttpMethod.DELETE to listOf("/oauth/client")
@@ -91,9 +91,9 @@ class SecurityConfig {
     }
 
     @Bean
-    fun userDetailsService(tokenService: TokenService): ReactiveUserDetailsService {
+    fun userDetailsService(tokenStore: TokenStore): ReactiveUserDetailsService {
         return ReactiveUserDetailsService { name ->
-            tokenService.checkAccessTokenExist(name)
+            tokenStore.getAccessToken(name)
                 .map { accessTokenRedis ->
                     User(
                         "${accessTokenRedis.accountId}",

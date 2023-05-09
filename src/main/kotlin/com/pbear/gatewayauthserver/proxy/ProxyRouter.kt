@@ -17,6 +17,7 @@ class ProxyRouter(private val apiAccessControlFilter: ApiAccessControlFilter) {
             predicateSpec
                 .path("/main/**")
                 .filters { it
+                    .filter(apiAccessControlFilter.apply(ApiAccessControlFilter.Config()))
                     .rewritePath("^/main", "")
                 }
                 .uri("http://192.168.0.103:40001")

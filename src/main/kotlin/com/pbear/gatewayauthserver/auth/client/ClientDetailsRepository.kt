@@ -1,6 +1,5 @@
-package com.pbear.gatewayauthserver.auth.client.repository
+package com.pbear.gatewayauthserver.auth.client
 
-import com.pbear.gatewayauthserver.auth.client.data.entity.ClientDetails
 import org.springframework.data.repository.reactive.ReactiveCrudRepository
 import reactor.core.publisher.Mono
 

@@ -1,4 +1,4 @@
-package com.pbear.gatewayauthserver.auth.client.data.entity
+package com.pbear.gatewayauthserver.auth.client
 
 import com.nimbusds.oauth2.sdk.GrantType
 import com.nimbusds.oauth2.sdk.auth.ClientAuthenticationMethod

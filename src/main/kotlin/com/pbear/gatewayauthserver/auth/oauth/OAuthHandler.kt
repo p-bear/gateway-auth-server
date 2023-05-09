@@ -1,4 +1,4 @@
-package com.pbear.gatewayauthserver.auth.oauth.handler
+package com.pbear.gatewayauthserver.auth.oauth
 
 import com.nimbusds.common.contenttype.ContentType
 import com.nimbusds.oauth2.sdk.AccessTokenResponse
@@ -9,8 +9,7 @@ import com.nimbusds.oauth2.sdk.auth.ClientAuthentication
 import com.nimbusds.oauth2.sdk.http.HTTPRequest
 import com.nimbusds.oauth2.sdk.util.URLUtils
 import com.nimbusds.oauth2.sdk.util.X509CertificateUtils
-import com.pbear.gatewayauthserver.auth.client.handler.ClientAuthenticationVerifierEncodeSupport
-import com.pbear.gatewayauthserver.auth.oauth.service.TokenService
+import com.pbear.gatewayauthserver.auth.client.ClientAuthenticationVerifierEncodeSupport
 import mu.KotlinLogging
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Component

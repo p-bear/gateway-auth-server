@@ -1,6 +1,5 @@
-package com.pbear.gatewayauthserver.auth.client.router
+package com.pbear.gatewayauthserver.auth.client
 
-import com.pbear.gatewayauthserver.auth.client.handler.ClientHandler
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.web.reactive.function.server.*

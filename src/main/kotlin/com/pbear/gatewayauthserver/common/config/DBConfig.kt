@@ -1,7 +1,7 @@
 package com.pbear.gatewayauthserver.common.config
 
-import com.pbear.gatewayauthserver.auth.oauth.data.entity.AccessTokenRedis
-import com.pbear.gatewayauthserver.auth.oauth.data.entity.RefreshTokenRedis
+import com.pbear.gatewayauthserver.auth.oauth.AccessTokenRedis
+import com.pbear.gatewayauthserver.auth.oauth.RefreshTokenRedis
 import io.r2dbc.spi.ConnectionFactories
 import io.r2dbc.spi.ConnectionFactory
 import io.r2dbc.spi.ConnectionFactoryOptions

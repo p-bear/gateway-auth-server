@@ -1,7 +1,5 @@
-package com.pbear.gatewayauthserver.auth.client.handler
+package com.pbear.gatewayauthserver.auth.client
 
-import com.pbear.gatewayauthserver.auth.client.data.entity.ClientDetails
-import com.pbear.gatewayauthserver.auth.client.repository.ClientDetailsRepository
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpStatus
@@ -54,5 +52,10 @@ class ClientHandler(
                 }
             }
             .flatMap { ServerResponse.ok().build() }
+    }
+
+    fun getClient(clientId: String, clientAuthenticationMethod: String): Mono<ClientDetails> {
+        return this.clientDetailsRepository
+            .findByClientIdAndClientAuthenticationMethod(clientId, clientAuthenticationMethod)
     }
 }

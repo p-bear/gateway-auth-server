@@ -11,8 +11,8 @@ class ApiAccessControlFilter: AbstractGatewayFilterFactory<ApiAccessControlFilte
     private val log = KotlinLogging.logger {  }
 
     override fun apply(config: Config): GatewayFilter = GatewayFilter { exchange, chain ->
-
-        chain.filter(exchange).then(Mono.fromRunnable { log.info("qwer") })
+        // TODO: req url 로깅 및 header에 accountId 처리?
+        chain.filter(exchange).then(Mono.fromRunnable { log.info("test-log") })
     }
 
 

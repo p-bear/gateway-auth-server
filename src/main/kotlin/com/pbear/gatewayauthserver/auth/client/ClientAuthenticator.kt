@@ -1,4 +1,4 @@
-package com.pbear.gatewayauthserver.auth.client.handler
+package com.pbear.gatewayauthserver.auth.client
 
 import com.nimbusds.jose.JWSHeader
 import com.nimbusds.oauth2.sdk.auth.ClientAuthentication
@@ -8,8 +8,6 @@ import com.nimbusds.oauth2.sdk.auth.Secret
 import com.nimbusds.oauth2.sdk.auth.verifier.*
 import com.nimbusds.oauth2.sdk.id.Audience
 import com.nimbusds.oauth2.sdk.id.ClientID
-import com.pbear.gatewayauthserver.auth.client.data.entity.ClientDetails
-import com.pbear.gatewayauthserver.auth.client.repository.ClientDetailsRepository
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Component
 import java.security.PublicKey
