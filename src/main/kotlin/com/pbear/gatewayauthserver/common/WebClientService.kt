@@ -18,7 +18,7 @@ class WebClientService(private val webClient: WebClient) {
             .baseUrl(mainServerBaseurl)
             .build()
             .post()
-            .uri("/main/api/account/password")
+            .uri("/api/account/password")
             .bodyValue(mapOf("userId" to userId, "password" to password))
             .exchangeToMono {
                 when (it.statusCode()) {
