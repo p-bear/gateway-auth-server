@@ -25,13 +25,13 @@ class TokenService(private val tokenStore: TokenStore,
 
     fun getToken(tokenRequest: TokenRequest, clientAuthentication: ClientAuthentication): Mono<Tokens> {
         return when (tokenRequest.authorizationGrant.type) {
-            GrantType.PASSWORD -> this.processPasswordGrant(tokenRequest, clientAuthentication)
-            GrantType.REFRESH_TOKEN -> this.processRefreshTokenGrant(tokenRequest, clientAuthentication)
+            GrantType.PASSWORD -> this.handlePasswordGrant(tokenRequest, clientAuthentication)
+            GrantType.REFRESH_TOKEN -> this.handleRefreshTokenGrant(tokenRequest, clientAuthentication)
             else -> throw ResponseStatusException(HttpStatus.BAD_REQUEST, "grantType not supported, grantType: ${tokenRequest.authorizationGrant.type.value}")
         }
     }
 
-    fun processPasswordGrant(tokenRequest: TokenRequest, clientAuthentication: ClientAuthentication): Mono<Tokens> {
+    fun handlePasswordGrant(tokenRequest: TokenRequest, clientAuthentication: ClientAuthentication): Mono<Tokens> {
         val reqBodyGrant = tokenRequest.authorizationGrant as ResourceOwnerPasswordCredentialsGrant
         return this.webClientService.postCheckAccountPassword(reqBodyGrant.username, reqBodyGrant.password.value)
             .flatMap { accountPasswordResponse ->
@@ -43,7 +43,7 @@ class TokenService(private val tokenStore: TokenStore,
             .map { this.mapToTokens(it.value, it.issueTime, it.accessTokenValidity, it.scopes, it.refreshToken) }
     }
 
-    fun processRefreshTokenGrant(tokenRequest: TokenRequest, clientAuthentication: ClientAuthentication): Mono<Tokens> {
+    fun handleRefreshTokenGrant(tokenRequest: TokenRequest, clientAuthentication: ClientAuthentication): Mono<Tokens> {
         val reqBodyGrant = tokenRequest.authorizationGrant as RefreshTokenGrant
         return this.refreshToken(
             clientAuthentication.clientID.value,

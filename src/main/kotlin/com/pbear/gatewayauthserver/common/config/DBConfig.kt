@@ -93,10 +93,16 @@ class R2dbcMainDBConfig {
 
 @Configuration
 class BasicRedisConfig {
+    @Value("\${redis.main.host}")
+    val host: String = ""
+
+    @Value("\${redis.main.port}")
+    val port: Int = -1
+
     @Primary
     @Bean
     fun reactiveRedisConnectionFactory(): ReactiveRedisConnectionFactory {
-        return LettuceConnectionFactory("192.168.0.103", 6379)
+        return LettuceConnectionFactory(host, port)
     }
 
     @Primary

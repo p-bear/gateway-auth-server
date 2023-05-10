@@ -23,7 +23,7 @@ class WebClientService(private val webClient: WebClient) {
             .exchangeToMono {
                 when (it.statusCode()) {
                     HttpStatus.OK -> it.bodyToMono(HashMap::class.java).map { res ->  res as HashMap<String, Any> }
-                    else -> throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "fail to match id / password, id=$password")
+                    else -> throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "fail to match id / password, id=$userId")
                 }
             }
     }

@@ -37,7 +37,7 @@ import java.security.Principal
 @Configuration
 class SecurityConfig {
     companion object {
-        private val permitAllApiMap = mapOf(
+        val permitAllApiMap = mapOf(
             HttpMethod.GET to listOf("/oauth/client", "/authorize"),
             HttpMethod.POST to listOf("/oauth/client", "/oauth/token", "/main/api/account"),
             HttpMethod.PUT to listOf("/oauth/client"),
@@ -132,8 +132,9 @@ class AuthManager(private val userDetailsService: ReactiveUserDetailsService): R
 
 @Component
 class AuthenticationConverter: ServerAuthenticationConverter {
+    val tokenUrls = listOf("/oauth/token", "/authorize")
     override fun convert(exchange: ServerWebExchange): Mono<Authentication> {
-        if (exchange.request.uri.path.equals("/oauth/token")) {
+        if (tokenUrls.contains(exchange.request.uri.path)) {
             return Mono.just(UsernamePasswordAuthenticationToken.authenticated(null, null, null))
         }
         val token = exchange.request.headers.getFirst(HttpHeaders.AUTHORIZATION)

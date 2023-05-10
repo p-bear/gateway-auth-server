@@ -9,9 +9,10 @@ class OAuthRouter {
     @Bean
     fun oauthRoute(oAuthHandler: OAuthHandler): RouterFunction<ServerResponse> = RouterFunctions
         .nest(
-            RequestPredicates.path("/oauth"),
+            RequestPredicates.all(),
             router {
-                POST("/token", oAuthHandler::handleOauthToken)
+                POST("/oauth/token", oAuthHandler::handleOauthToken)
+                GET("/authorize", oAuthHandler::handleGetAuthorize)
             }
         )
 }
