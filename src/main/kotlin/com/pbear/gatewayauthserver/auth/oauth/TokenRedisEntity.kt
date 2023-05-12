@@ -39,3 +39,10 @@ data class RefreshTokenRedis(
     val accessToken: String,
     val refreshTokenValidity: Long
 )
+
+@NoArg
+data class AuthorizationCodeRedis(
+    val accountId: Long,
+    val clientId: String,
+    val clientAuthenticationMethod: String
+)

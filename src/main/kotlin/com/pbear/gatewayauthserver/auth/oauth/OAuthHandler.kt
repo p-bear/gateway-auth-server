@@ -7,6 +7,7 @@ import com.nimbusds.oauth2.sdk.http.HTTPRequest
 import com.nimbusds.oauth2.sdk.util.URLUtils
 import com.nimbusds.oauth2.sdk.util.X509CertificateUtils
 import com.pbear.gatewayauthserver.auth.client.ClientAuthenticationVerifierEncodeSupport
+import com.pbear.gatewayauthserver.auth.client.ClientHandler
 import com.pbear.gatewayauthserver.common.WebClientService
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
@@ -31,7 +32,8 @@ class OAuthHandler(
     private val clientVerifier: ClientAuthenticationVerifierEncodeSupport,
     private val tokenService: TokenService,
     private val webClientService: WebClientService,
-    private val oAuthRedisRepository: OAuthRedisRepository
+    private val oAuthRedisRepository: OAuthRedisRepository,
+    private val clientHandler: ClientHandler
 ) {
     private val log = KotlinLogging.logger {  }
 
@@ -45,12 +47,7 @@ class OAuthHandler(
             .map { TokenRequest.parse(it) }
             .zipWhen { Mono.just(ClientAuthentication.parse(it.toHTTPRequest())) }
             .doOnNext { this.clientVerifier.verify(it.t2, null, null) }
-            .flatMap {
-                when (it.t1.authorizationGrant.type) {
-                    GrantType.PASSWORD, GrantType.REFRESH_TOKEN -> this.tokenService.getToken(it.t1, it.t2)
-                    else -> throw ResponseStatusException(HttpStatus.BAD_REQUEST, "grantType not supported, grantType: ${it.t1.authorizationGrant.type.value}")
-                }
-            }
+            .flatMap { this.tokenService.getToken(it.t1, it.t2) }
             .flatMap{ ServerResponse.ok().bodyValue(AccessTokenResponse.parse(it.toJSONObject()).toJSONObject()) }
     }
 
@@ -79,26 +76,35 @@ class OAuthHandler(
         val authorizationCode = UUID.randomUUID().toString()
         return this.webClientService
             .postCheckAccountPassword(authorizationRequest.customParameters["username"]!![0], authorizationRequest.customParameters["password"]!![0])
-            .flatMap { accountPasswordResponse ->
-                this.oAuthRedisRepository.saveAuthorizationCode(
-                    (accountPasswordResponse["id"] as Int).toLong(),
-                    authorizationCode,
-                    Duration.ofSeconds(60L))
+            .zipWhen { accountPasswordResponse ->
+                this.clientHandler.getClient(clientAuthentication.clientID.value, clientAuthentication.method.value)
+                    .flatMap { clientDetails ->
+                        this.oAuthRedisRepository.saveAuthorizationCode(
+                            authorizationCode,
+                            AuthorizationCodeRedis(
+                                (accountPasswordResponse["id"] as Int).toLong(),
+                                clientDetails.clientId,
+                                clientDetails.clientAuthenticationMethod),
+                            Duration.ofSeconds(60L))
+                    }
             }
             .map {
-                if (it) {
-                    val redirectParameter = mutableMapOf("code" to mutableListOf(authorizationCode))
-                    if (authorizationRequest.state?.value != null) {
-                        redirectParameter["state"] = mutableListOf(authorizationRequest.state.value)
-                    }
-                    AuthorizationSuccessResponse.parse(authorizationRequest.redirectionURI ?: URI(this.loginRedirectUrl), redirectParameter)
-                } else {
-                    throw ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "fail to save authorizationCode")
+                if (!it.t2) throw ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "fail to save authorizationCode")
+                it.t1
+            }
+            .map {
+                val redirectParameter = mutableMapOf(
+                    "code" to mutableListOf(authorizationCode),
+                    "accountId" to mutableListOf((it["id"] as Int).toString())
+                )
+                if (authorizationRequest.state?.value != null) {
+                    redirectParameter["state"] = mutableListOf(authorizationRequest.state.value)
                 }
+                AuthorizationSuccessResponse.parse(authorizationRequest.redirectionURI ?: URI(this.loginRedirectUrl), redirectParameter)
             }
             .flatMap {
                 ServerResponse
-                    .status(HttpStatus.PERMANENT_REDIRECT)
+                    .status(HttpStatus.OK)
                     .header(HttpHeaders.LOCATION, it.toURI().toString())
                     .build()}
     }

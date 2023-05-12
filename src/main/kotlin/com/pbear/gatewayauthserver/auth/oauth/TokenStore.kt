@@ -1,14 +1,20 @@
 package com.pbear.gatewayauthserver.auth.oauth
 
 import com.pbear.gatewayauthserver.auth.client.ClientDetails
+import com.pbear.gatewayauthserver.auth.client.ClientHandler
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Component
 import org.springframework.web.server.ResponseStatusException
 import reactor.core.publisher.Mono
 import reactor.core.scheduler.Schedulers
+import reactor.kotlin.core.publisher.switchIfEmpty
+import java.util.UUID
 
 @Component
-class TokenStore(private val oAuthRedisRepository: OAuthRedisRepository) {
+class TokenStore(
+    private val oAuthRedisRepository: OAuthRedisRepository,
+    private val clientHandler: ClientHandler
+) {
     fun createAccessToken(accessTokenValue: String, refreshTokenValue: String, clientDetails: ClientDetails, accountId: Long): AccessTokenRedis {
         return AccessTokenRedis(accessTokenValue, clientDetails, accountId, refreshTokenValue)
     }
@@ -33,6 +39,23 @@ class TokenStore(private val oAuthRedisRepository: OAuthRedisRepository) {
                 }
                 sink.next(accessTokenRedis)
             }
+    }
+
+    fun createSaveAccessTokenRefreshToken(clientId: String, clientAuthenticationMethod: String, accountId: Long): Mono<AccessTokenRedis> {
+        return this.clientHandler.getClient(clientId, clientAuthenticationMethod)
+            .zipWhen { clientDetails ->
+                val accessTokenRedis = this.createAccessToken(UUID.randomUUID().toString(), UUID.randomUUID().toString(), clientDetails, accountId)
+                this.saveAccessToken(accessTokenRedis)
+            }
+            .zipWhen {
+                val refreshTokenRedis = this.createRefreshToken(
+                    it.t2.value,
+                    it.t2.refreshToken,
+                    it.t1,
+                    it.t2.accountId)
+                this.saveRefreshToken(refreshTokenRedis)
+            }
+            .map { it.t1.t2 }
     }
 
     fun createRefreshToken(accessTokenValue: String, refreshTokenValue: String, clientDetails: ClientDetails, accountId: Long): RefreshTokenRedis {
@@ -68,8 +91,10 @@ class TokenStore(private val oAuthRedisRepository: OAuthRedisRepository) {
         return this.oAuthRedisRepository.getAccountAccessTokenMapping(clientId, clientAuthenticationMethod, accountId)
     }
 
-    fun getRefreshToken(refreshTokenValue: String): Mono<RefreshTokenRedis> {
-        return this.oAuthRedisRepository.getRefreshToken(refreshTokenValue)
+    fun getAccessTokenByAuthorizationCode(authorizationCode: String): Mono<AccessTokenRedis> {
+        return this.oAuthRedisRepository.getAuthorizationCode(authorizationCode)
+            .switchIfEmpty { throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "invalid authorizationCode") }
+            .flatMap { this.createSaveAccessTokenRefreshToken(it.clientId, it.clientAuthenticationMethod, it.accountId) }
     }
 
     fun deleteAccessToken(accessTokenRedis: AccessTokenRedis): Mono<Boolean> {
@@ -81,6 +106,10 @@ class TokenStore(private val oAuthRedisRepository: OAuthRedisRepository) {
                     accessTokenRedis.clientAuthenticationMethod,
                     accessTokenRedis.accountId)
             }
+    }
+
+    fun getRefreshToken(refreshTokenValue: String): Mono<RefreshTokenRedis> {
+        return this.oAuthRedisRepository.getRefreshToken(refreshTokenValue)
     }
 
     fun deleteRefreshToken(refreshTokenRedis: RefreshTokenRedis): Mono<Boolean> {

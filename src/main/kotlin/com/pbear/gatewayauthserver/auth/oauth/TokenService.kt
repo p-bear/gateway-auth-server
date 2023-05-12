@@ -1,5 +1,6 @@
 package com.pbear.gatewayauthserver.auth.oauth
 
+import com.nimbusds.oauth2.sdk.AuthorizationCodeGrant
 import com.nimbusds.oauth2.sdk.GrantType
 import com.nimbusds.oauth2.sdk.RefreshTokenGrant
 import com.nimbusds.oauth2.sdk.ResourceOwnerPasswordCredentialsGrant
@@ -27,6 +28,7 @@ class TokenService(private val tokenStore: TokenStore,
         return when (tokenRequest.authorizationGrant.type) {
             GrantType.PASSWORD -> this.handlePasswordGrant(tokenRequest, clientAuthentication)
             GrantType.REFRESH_TOKEN -> this.handleRefreshTokenGrant(tokenRequest, clientAuthentication)
+            GrantType.AUTHORIZATION_CODE -> this.handleAuthorizationCodeGrant(tokenRequest, clientAuthentication)
             else -> throw ResponseStatusException(HttpStatus.BAD_REQUEST, "grantType not supported, grantType: ${tokenRequest.authorizationGrant.type.value}")
         }
     }
@@ -38,7 +40,7 @@ class TokenService(private val tokenStore: TokenStore,
                 val accountId = (accountPasswordResponse["id"] as Int).toLong()
                 this.tokenStore.getAccessToken(clientAuthentication.clientID.value, clientAuthentication.method.value, accountId)
                     // 기존 토큰이 없는 경우 AccessToken, RefreshToken 생성 및 저장
-                    .switchIfEmpty { this.createSaveAccessTokenRefreshToken(clientAuthentication.clientID.value, clientAuthentication.method.value, accountId) }
+                    .switchIfEmpty { this.tokenStore.createSaveAccessTokenRefreshToken(clientAuthentication.clientID.value, clientAuthentication.method.value, accountId) }
             }
             .map { this.mapToTokens(it.value, it.issueTime, it.accessTokenValidity, it.scopes, it.refreshToken) }
     }
@@ -51,23 +53,13 @@ class TokenService(private val tokenStore: TokenStore,
             reqBodyGrant.refreshToken.value)
     }
 
-
-    fun createSaveAccessTokenRefreshToken(clientId: String, clientAuthenticationMethod: String, accountId: Long): Mono<AccessTokenRedis> {
-        return this.clientHandler.getClient(clientId, clientAuthenticationMethod)
-            .zipWhen { clientDetails ->
-                val accessTokenRedis = this.tokenStore.createAccessToken(UUID.randomUUID().toString(), UUID.randomUUID().toString(), clientDetails, accountId)
-                this.tokenStore.saveAccessToken(accessTokenRedis)
-            }
-            .zipWhen {
-                val refreshTokenRedis = this.tokenStore.createRefreshToken(
-                    it.t2.value,
-                    it.t2.refreshToken,
-                    it.t1,
-                    it.t2.accountId)
-                this.tokenStore.saveRefreshToken(refreshTokenRedis)
-            }
-            .map { it.t1.t2 }
+    fun handleAuthorizationCodeGrant(tokenRequest: TokenRequest, clientAuthentication: ClientAuthentication): Mono<Tokens> {
+        val authorizationCodeGrant = tokenRequest.authorizationGrant as AuthorizationCodeGrant
+        return this.tokenStore
+            .getAccessTokenByAuthorizationCode(authorizationCodeGrant.authorizationCode.value)
+            .map { this.mapToTokens(it.value, it.issueTime, it.accessTokenValidity, it.scopes, it.refreshToken) }
     }
+
 
     fun refreshToken(clientId: String, clientAuthenticationMethod: String, refreshTokenValue: String): Mono<Tokens> {
         return this.clientHandler.getClient(clientId, clientAuthenticationMethod)
@@ -87,7 +79,7 @@ class TokenService(private val tokenStore: TokenStore,
                     .zipWhen { this.tokenStore.deleteRefreshToken(it) }
                     .map { it.t1 }
                     .flatMap { refreshTokenRedis ->
-                        this.createSaveAccessTokenRefreshToken(
+                        this.tokenStore.createSaveAccessTokenRefreshToken(
                             clientId,
                             clientAuthenticationMethod,
                             refreshTokenRedis.accountId)

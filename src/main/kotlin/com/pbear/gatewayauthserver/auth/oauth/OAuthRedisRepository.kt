@@ -9,9 +9,11 @@ import java.time.Duration
 @Component
 class OAuthRedisRepository(private val reactiveRedisTemplate: ReactiveRedisTemplate<String, String>,
                            @Qualifier("AccessTokenReactiveRedisTemplate")
-                      private val accessTokenRedisTemplate: ReactiveRedisTemplate<String, AccessTokenRedis>,
+                           private val accessTokenRedisTemplate: ReactiveRedisTemplate<String, AccessTokenRedis>,
                            @Qualifier("refreshTokenReactiveRedisTemplate")
-                      private val refreshTokenRedisTemplate: ReactiveRedisTemplate<String, RefreshTokenRedis>
+                           private val refreshTokenRedisTemplate: ReactiveRedisTemplate<String, RefreshTokenRedis>,
+                           @Qualifier("authorizationCodeReactiveRedisTemplate")
+                           private val authorizationCodeRedisTemplate: ReactiveRedisTemplate<String, AuthorizationCodeRedis>
 ) {
     fun saveAccessToken(accessTokenRedis: AccessTokenRedis): Mono<Boolean> {
         return this.accessTokenRedisTemplate.opsForValue()
@@ -58,15 +60,14 @@ class OAuthRedisRepository(private val reactiveRedisTemplate: ReactiveRedisTempl
         return this.reactiveRedisTemplate.opsForValue().delete(getClientIdMethodAccountIdKey(clientId, clientAuthenticationMethod, accountId))
     }
 
-    fun saveAuthorizationCode(accountId: Long, authorizationCode: String, duration: Duration): Mono<Boolean> {
-        return this.reactiveRedisTemplate.opsForValue()
-            .set(getAuthorizationCodeKey(accountId), authorizationCode, duration)
+    fun saveAuthorizationCode(authorizationCode: String, authorizationCodeRedis: AuthorizationCodeRedis, duration: Duration): Mono<Boolean> {
+        return this.authorizationCodeRedisTemplate.opsForValue()
+            .set(getAuthorizationCodeKey(authorizationCode), authorizationCodeRedis, duration)
     }
-    fun getAuthorizationCode(accountId: Long): Mono<String> {
-        return this.reactiveRedisTemplate.opsForValue()
-            .get(getAuthorizationCodeKey(accountId))
+    fun getAuthorizationCode(authorizationCode: String): Mono<AuthorizationCodeRedis> {
+        return this.authorizationCodeRedisTemplate.opsForValue()
+            .get(getAuthorizationCodeKey(authorizationCode))
     }
-
 
 
     companion object {
@@ -87,8 +88,8 @@ class OAuthRedisRepository(private val reactiveRedisTemplate: ReactiveRedisTempl
             return "${REFRESH_TOKEN_PREFIX}_${refreshTokenValue}"
         }
 
-        fun getAuthorizationCodeKey(accountId: Long): String {
-            return "${AUTHORIZATION_CODE}_${accountId}"
+        fun getAuthorizationCodeKey(authorizationCode: String): String {
+            return "${AUTHORIZATION_CODE}_${authorizationCode}"
         }
     }
 }
