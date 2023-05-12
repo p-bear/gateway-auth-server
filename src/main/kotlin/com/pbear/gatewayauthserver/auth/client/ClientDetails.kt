@@ -20,6 +20,7 @@ data class ClientDetails(
     var grantTypes: String = GrantType.PASSWORD.value,
     var accessTokenValidity: Long = 86400,
     var refreshTokenValidity: Long = 2592000,
+    val redirectUri: String = "",
 
     @CreatedDate
     var creDate: LocalDateTime? = null,

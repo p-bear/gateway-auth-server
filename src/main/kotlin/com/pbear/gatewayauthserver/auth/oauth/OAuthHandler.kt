@@ -4,6 +4,7 @@ import com.nimbusds.common.contenttype.ContentType
 import com.nimbusds.oauth2.sdk.*
 import com.nimbusds.oauth2.sdk.auth.ClientAuthentication
 import com.nimbusds.oauth2.sdk.http.HTTPRequest
+import com.nimbusds.oauth2.sdk.token.AccessTokenType
 import com.nimbusds.oauth2.sdk.util.URLUtils
 import com.nimbusds.oauth2.sdk.util.X509CertificateUtils
 import com.pbear.gatewayauthserver.auth.client.ClientAuthenticationVerifierEncodeSupport
@@ -33,7 +34,8 @@ class OAuthHandler(
     private val tokenService: TokenService,
     private val webClientService: WebClientService,
     private val oAuthRedisRepository: OAuthRedisRepository,
-    private val clientHandler: ClientHandler
+    private val clientHandler: ClientHandler,
+    private val tokenStore: TokenStore
 ) {
     private val log = KotlinLogging.logger {  }
 
@@ -57,8 +59,9 @@ class OAuthHandler(
             .flatMap {
                 val authorizationRequest = AuthorizationRequest.parse(it)
                 when (authorizationRequest.responseType) {
-                    ResponseType.CODE -> handleAuthorizeCode(it, authorizationRequest)
-                    else -> throw ResponseStatusException(HttpStatus.BAD_REQUEST, "response_type not supported, responseType: ${authorizationRequest.responseType}")
+                    ResponseType.CODE -> this.handleAuthorizeCode(it, authorizationRequest)
+                    ResponseType.TOKEN -> this.handleAuthorizeToken(authorizationRequest)
+                    else -> return@flatMap Mono.error(ResponseStatusException(HttpStatus.BAD_REQUEST, "response_type not supported, responseType: ${authorizationRequest.responseType}"))
                 }
             }
     }
@@ -88,9 +91,12 @@ class OAuthHandler(
                             Duration.ofSeconds(60L))
                     }
             }
-            .map {
-                if (!it.t2) throw ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "fail to save authorizationCode")
-                it.t1
+            .handle { it, sink ->
+                if (!it.t2) {
+                    sink.error(ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "fail to save authorizationCode"))
+                    return@handle
+                }
+                sink.next(it.t1)
             }
             .map {
                 val redirectParameter = mutableMapOf(
@@ -106,7 +112,47 @@ class OAuthHandler(
                 ServerResponse
                     .status(HttpStatus.OK)
                     .header(HttpHeaders.LOCATION, it.toURI().toString())
-                    .build()}
+                    .build()
+            }
+    }
+
+    private fun handleAuthorizeToken(authorizationRequest: AuthorizationRequest): Mono<ServerResponse> {
+        if (authorizationRequest.customParameters["username"] == null || authorizationRequest.customParameters["password"] == null) {
+            return ServerResponse.status(HttpStatus.PERMANENT_REDIRECT)
+                .header(HttpHeaders.LOCATION, this.loginRedirectUrl)
+                .build()
+        }
+
+        if (authorizationRequest.clientID.value.isNullOrEmpty() || authorizationRequest.customParameters["client_authentication_method"].isNullOrEmpty()) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "clien_id and client_authentication_method required")
+        }
+
+        return this.webClientService.postCheckAccountPassword(authorizationRequest.customParameters["username"]!![0], authorizationRequest.customParameters["password"]!![0])
+            .flatMap {
+                this.tokenStore.createSaveAccessTokenRefreshToken(
+                    authorizationRequest.clientID.value,
+                    authorizationRequest.customParameters["client_authentication_method"]!![0],
+                    (it["id"] as Int).toLong())
+            }
+            .zipWhen { this.clientHandler.getClient(it.clientId, it.clientAuthenticationMethod) }
+            .map {
+                val redirectParameter = mutableMapOf(
+                    "access_token" to mutableListOf(it.t1.value),
+                    "token_type" to mutableListOf(AccessTokenType.BEARER.value),
+                    "accountId" to mutableListOf(it.t1.accountId.toString())
+                )
+                if (authorizationRequest.state?.value != null) {
+                    redirectParameter["state"] = mutableListOf(authorizationRequest.state.value)
+                }
+
+                AuthorizationSuccessResponse.parse(URI(it.t2.redirectUri), redirectParameter)
+            }
+            .flatMap {
+                ServerResponse
+                    .status(HttpStatus.OK)
+                    .header(HttpHeaders.LOCATION, it.toURI().toString())
+                    .build()
+            }
     }
 
     private fun <T> mapToHTTPRequest(serverRequest: ServerRequest, formData: MultiValueMap<String, String>?, body: T?): HTTPRequest {
