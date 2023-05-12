@@ -110,7 +110,7 @@ class OAuthHandler(
             }
             .flatMap {
                 ServerResponse
-                    .status(HttpStatus.OK)
+                    .status(HttpStatus.PERMANENT_REDIRECT)
                     .header(HttpHeaders.LOCATION, it.toURI().toString())
                     .build()
             }
@@ -149,7 +149,7 @@ class OAuthHandler(
             }
             .flatMap {
                 ServerResponse
-                    .status(HttpStatus.OK)
+                    .status(HttpStatus.PERMANENT_REDIRECT)
                     .header(HttpHeaders.LOCATION, it.toURI().toString())
                     .build()
             }
