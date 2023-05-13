@@ -127,25 +127,34 @@ class OAuthHandler(
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "clien_id and client_authentication_method required")
         }
 
+        if (authorizationRequest.redirectionURI == null) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "redirect_uri required")
+        }
+
         return this.webClientService.postCheckAccountPassword(authorizationRequest.customParameters["username"]!![0], authorizationRequest.customParameters["password"]!![0])
-            .flatMap {
+            .zipWhen { this.clientHandler.getClient(authorizationRequest.clientID.value, authorizationRequest.customParameters["client_authentication_method"]!![0]) }
+            .doOnNext {
+                if (authorizationRequest.redirectionURI.toString() != it.t2.redirectUri) {
+                    throw ResponseStatusException(HttpStatus.BAD_REQUEST, "redirect_uri not match")
+                }
+            }
+            .zipWhen {
                 this.tokenStore.createSaveAccessTokenRefreshToken(
                     authorizationRequest.clientID.value,
                     authorizationRequest.customParameters["client_authentication_method"]!![0],
-                    (it["id"] as Int).toLong())
+                    (it.t1["id"] as Int).toLong())
             }
-            .zipWhen { this.clientHandler.getClient(it.clientId, it.clientAuthenticationMethod) }
             .map {
                 val redirectParameter = mutableMapOf(
-                    "access_token" to mutableListOf(it.t1.value),
+                    "access_token" to mutableListOf(it.t2.value),
                     "token_type" to mutableListOf(AccessTokenType.BEARER.value),
-                    "accountId" to mutableListOf(it.t1.accountId.toString())
+                    "accountId" to mutableListOf(it.t2.accountId.toString())
                 )
                 if (authorizationRequest.state?.value != null) {
                     redirectParameter["state"] = mutableListOf(authorizationRequest.state.value)
                 }
 
-                AuthorizationSuccessResponse.parse(URI(it.t2.redirectUri), redirectParameter)
+                AuthorizationSuccessResponse.parse(URI(it.t1.t2.redirectUri), redirectParameter)
             }
             .flatMap {
                 ServerResponse
