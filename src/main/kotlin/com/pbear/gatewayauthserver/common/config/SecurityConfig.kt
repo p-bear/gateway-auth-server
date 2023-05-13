@@ -33,10 +33,11 @@ import org.springframework.web.server.ServerWebExchange
 import reactor.core.publisher.Mono
 import reactor.kotlin.core.publisher.switchIfEmpty
 import java.security.Principal
+import java.util.stream.Collectors
 
 @Configuration
 class SecurityConfig {
-    companion object {
+    public companion object {
         val permitAllApiMap = mapOf(
             HttpMethod.GET to listOf("/oauth/client", "/authorize"),
             HttpMethod.POST to listOf("/oauth/client", "/oauth/token", "/main/api/account"),
@@ -55,8 +56,6 @@ class SecurityConfig {
 
         val authorizeExchangeSpec = serverHttpSecurity
             .authorizeExchange()
-            // main 서버 기본 scope -> main:*
-            .pathMatchers("/main/**").hasAuthority("SCOPE_main:*")
 
         // permitAll 세팅
         permitAllApiMap.forEach{ entry ->
@@ -64,6 +63,10 @@ class SecurityConfig {
                 authorizeExchangeSpec.pathMatchers(entry.key, uri).permitAll()
             }
         }
+
+        authorizeExchangeSpec
+            // main 서버 기본 scope -> main:*
+            .pathMatchers("/main/**").hasAuthority("SCOPE_main:*")
 
         return authorizeExchangeSpec
             .and()
@@ -132,9 +135,8 @@ class AuthManager(private val userDetailsService: ReactiveUserDetailsService): R
 
 @Component
 class AuthenticationConverter: ServerAuthenticationConverter {
-    val tokenUrls = listOf("/oauth/token", "/authorize")
     override fun convert(exchange: ServerWebExchange): Mono<Authentication> {
-        if (tokenUrls.contains(exchange.request.uri.path)) {
+        if (SecurityConfig.permitAllApiMap[exchange.request.method]!!.contains(exchange.request.uri.path)) {
             return Mono.just(UsernamePasswordAuthenticationToken.authenticated(null, null, null))
         }
         val token = exchange.request.headers.getFirst(HttpHeaders.AUTHORIZATION)
