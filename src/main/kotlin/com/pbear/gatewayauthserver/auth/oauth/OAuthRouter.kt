@@ -13,6 +13,7 @@ class OAuthRouter {
             router {
                 POST("/oauth/token", oAuthHandler::handleOauthToken)
                 GET("/authorize", oAuthHandler::handleGetAuthorize)
+                POST("/oauth/token/google", oAuthHandler::handlePostOAuthTokenGoogle)
             }
         )
 }

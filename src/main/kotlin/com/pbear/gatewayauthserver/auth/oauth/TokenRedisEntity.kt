@@ -31,6 +31,18 @@ data class AccessTokenRedis(
 }
 
 @NoArg
+data class GoogleAccessTokenRedis(
+    val accessToken: String,
+    val idToken: String,
+    val scope: String,
+    val accountId: Long,
+    val clientId: String,
+    val clientAuthenticationMethod: String,
+    val issueTime: Long = Date().time,
+    val expiresIn: Long
+)
+
+@NoArg
 data class RefreshTokenRedis(
     val value: String,
     val clientId: String,

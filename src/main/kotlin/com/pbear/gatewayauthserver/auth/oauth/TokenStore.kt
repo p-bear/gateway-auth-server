@@ -115,4 +115,24 @@ class TokenStore(
     fun deleteRefreshToken(refreshTokenRedis: RefreshTokenRedis): Mono<Boolean> {
         return this.oAuthRedisRepository.deleteRefreshToken(refreshTokenRedis.value)
     }
+
+    fun saveGoogleAccessToken(accessTokenValue: String, idToken: String, scope: String, expiresIn: Long,
+                              accountId: Long, clientId: String, clientAuthenticationMethod: String, ): Mono<GoogleAccessTokenRedis> {
+        val googleAccessTokenRedis = GoogleAccessTokenRedis(
+            accessToken = accessTokenValue,
+            idToken = idToken,
+            scope = scope,
+            accountId = accountId,
+            clientId = clientId,
+            clientAuthenticationMethod = clientAuthenticationMethod,
+            expiresIn = expiresIn)
+        return this.oAuthRedisRepository.saveGoogleAccessToken(googleAccessTokenRedis)
+            .handle { it, sink ->
+                if (!it) {
+                    sink.error(ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "fail to save google accessToken"))
+                    return@handle
+                }
+                sink.next(googleAccessTokenRedis)
+            }
+    }
 }

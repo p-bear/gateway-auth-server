@@ -4,6 +4,7 @@ import com.nimbusds.oauth2.sdk.Scope
 import com.nimbusds.oauth2.sdk.token.AccessToken
 import com.nimbusds.oauth2.sdk.token.AccessTokenType
 import com.nimbusds.oauth2.sdk.token.BearerAccessToken
+import com.pbear.gatewayauthserver.auth.oauth.AccessTokenRedis
 import com.pbear.gatewayauthserver.auth.oauth.TokenStore
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -15,9 +16,9 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.config.web.server.SecurityWebFiltersOrder
 import org.springframework.security.config.web.server.ServerHttpSecurity
 import org.springframework.security.core.Authentication
+import org.springframework.security.core.GrantedAuthority
 import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.core.userdetails.ReactiveUserDetailsService
-import org.springframework.security.core.userdetails.User
 import org.springframework.security.core.userdetails.UserDetails
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
 import org.springframework.security.crypto.password.PasswordEncoder
@@ -33,7 +34,6 @@ import org.springframework.web.server.ServerWebExchange
 import reactor.core.publisher.Mono
 import reactor.kotlin.core.publisher.switchIfEmpty
 import java.security.Principal
-import java.util.stream.Collectors
 
 @Configuration
 class SecurityConfig {
@@ -67,6 +67,7 @@ class SecurityConfig {
         authorizeExchangeSpec
             // main 서버 기본 scope -> main:*
             .pathMatchers("/main/**").hasAuthority("SCOPE_main:*")
+            .pathMatchers("/oauth/token/google").authenticated()
 
         return authorizeExchangeSpec
             .and()
@@ -97,21 +98,7 @@ class SecurityConfig {
     fun userDetailsService(tokenStore: TokenStore): ReactiveUserDetailsService {
         return ReactiveUserDetailsService { name ->
             tokenStore.getAccessToken(name)
-                .map { accessTokenRedis ->
-                    User(
-                        "${accessTokenRedis.accountId}",
-                        accessTokenRedis.value,
-                        Scope.parse(accessTokenRedis.scopes)
-                            .map {
-                                SimpleGrantedAuthority("SCOPE_${it.value}")
-                            }
-                            .plus(accessTokenRedis.authorities.split(",")
-                                .map {
-                                    SimpleGrantedAuthority("ROLE_$it")
-                                }
-                            )
-                    ) as UserDetails
-                }
+                .map { CustomUserDetail(it) as UserDetails }
                 .switchIfEmpty { throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "invalid accessToken") }
         }
     }
@@ -128,7 +115,7 @@ class AuthManager(private val userDetailsService: ReactiveUserDetailsService): R
         }
         return this.userDetailsService.findByUsername(authentication.name)
             .map {
-                UsernamePasswordAuthenticationToken(it.username, it.password, it.authorities)
+                UsernamePasswordAuthenticationToken(it.username, it, it.authorities)
             }
     }
 }
@@ -149,4 +136,33 @@ class TokenPrincipal(private val accessToken: AccessToken): Principal {
     override fun getName(): String {
         return this.accessToken.value
     }
+}
+
+class CustomUserDetail(
+    private val accessTokenRedis: AccessTokenRedis
+): UserDetails {
+    override fun getAuthorities(): MutableCollection<out GrantedAuthority> = Scope.parse(accessTokenRedis.scopes)
+        .map {
+            SimpleGrantedAuthority("SCOPE_${it.value}")
+        }
+        .plus(accessTokenRedis.authorities.split(",")
+            .map {
+                SimpleGrantedAuthority("ROLE_$it")
+            }
+        )
+        .toMutableList()
+
+    override fun getPassword(): String = this.accessTokenRedis.value
+
+    override fun getUsername(): String = this.accessTokenRedis.accountId.toString()
+
+    override fun isAccountNonExpired(): Boolean = true
+
+    override fun isAccountNonLocked(): Boolean = true
+
+    override fun isCredentialsNonExpired(): Boolean = true
+
+    override fun isEnabled(): Boolean = true
+
+    fun getAccessTokenRedis(): AccessTokenRedis = this.accessTokenRedis
 }

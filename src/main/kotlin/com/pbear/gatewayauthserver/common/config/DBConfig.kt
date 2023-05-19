@@ -2,6 +2,7 @@ package com.pbear.gatewayauthserver.common.config
 
 import com.pbear.gatewayauthserver.auth.oauth.AccessTokenRedis
 import com.pbear.gatewayauthserver.auth.oauth.AuthorizationCodeRedis
+import com.pbear.gatewayauthserver.auth.oauth.GoogleAccessTokenRedis
 import com.pbear.gatewayauthserver.auth.oauth.RefreshTokenRedis
 import io.r2dbc.spi.ConnectionFactories
 import io.r2dbc.spi.ConnectionFactory
@@ -150,6 +151,17 @@ class BasicRedisConfig {
         val builder: RedisSerializationContextBuilder<String, AuthorizationCodeRedis> =
             RedisSerializationContext.newSerializationContext(keySerializer)
         val context: RedisSerializationContext<String, AuthorizationCodeRedis> = builder.value(valueSerializer).build()
+        return ReactiveRedisTemplate(factory, context)
+    }
+
+    @Bean
+    @Qualifier("googleAccessTokenRedisReactiveRedisTemplate")
+    fun googleAccessTokenRedisReactiveRedisTemplate(factory: ReactiveRedisConnectionFactory): ReactiveRedisTemplate<String, GoogleAccessTokenRedis> {
+        val keySerializer = StringRedisSerializer()
+        val valueSerializer = Jackson2JsonRedisSerializer(GoogleAccessTokenRedis::class.java)
+        val builder: RedisSerializationContextBuilder<String, GoogleAccessTokenRedis> =
+            RedisSerializationContext.newSerializationContext(keySerializer)
+        val context: RedisSerializationContext<String, GoogleAccessTokenRedis> = builder.value(valueSerializer).build()
         return ReactiveRedisTemplate(factory, context)
     }
 }

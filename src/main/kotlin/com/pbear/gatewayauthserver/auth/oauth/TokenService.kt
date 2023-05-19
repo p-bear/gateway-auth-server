@@ -11,6 +11,7 @@ import com.nimbusds.oauth2.sdk.token.BearerAccessToken
 import com.nimbusds.oauth2.sdk.token.RefreshToken
 import com.nimbusds.oauth2.sdk.token.Tokens
 import com.pbear.gatewayauthserver.auth.client.ClientHandler
+import com.pbear.gatewayauthserver.auth.oauth.third.ResGooglePostOauthToken
 import com.pbear.gatewayauthserver.common.WebClientService
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
@@ -95,5 +96,16 @@ class TokenService(private val tokenStore: TokenStore,
                 (issueTime + (accessTokenValidity * 1000) - Date().time) / 1000,
                 Scope.parse(scopes)),
             RefreshToken(refreshTokenValue))
+    }
+
+    fun upgradeAccessToken(accessTokenRedis: AccessTokenRedis, resGooglePostOauthToken: ResGooglePostOauthToken): Mono<GoogleAccessTokenRedis> {
+        return this.tokenStore.saveGoogleAccessToken(
+            resGooglePostOauthToken.access_token,
+            resGooglePostOauthToken.id_token,
+            resGooglePostOauthToken.scope,
+            resGooglePostOauthToken.expires_in.toLong(),
+            accessTokenRedis.accountId,
+            accessTokenRedis.clientId,
+            accessTokenRedis.clientAuthenticationMethod)
     }
 }

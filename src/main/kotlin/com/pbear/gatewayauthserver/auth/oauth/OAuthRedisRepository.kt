@@ -13,7 +13,9 @@ class OAuthRedisRepository(private val reactiveRedisTemplate: ReactiveRedisTempl
                            @Qualifier("refreshTokenReactiveRedisTemplate")
                            private val refreshTokenRedisTemplate: ReactiveRedisTemplate<String, RefreshTokenRedis>,
                            @Qualifier("authorizationCodeReactiveRedisTemplate")
-                           private val authorizationCodeRedisTemplate: ReactiveRedisTemplate<String, AuthorizationCodeRedis>
+                           private val authorizationCodeRedisTemplate: ReactiveRedisTemplate<String, AuthorizationCodeRedis>,
+                           @Qualifier("googleAccessTokenRedisReactiveRedisTemplate")
+                           private val googleAccessTokenRedisReactiveRedisTemplate: ReactiveRedisTemplate<String, GoogleAccessTokenRedis>,
 ) {
     fun saveAccessToken(accessTokenRedis: AccessTokenRedis): Mono<Boolean> {
         return this.accessTokenRedisTemplate.opsForValue()
@@ -69,12 +71,21 @@ class OAuthRedisRepository(private val reactiveRedisTemplate: ReactiveRedisTempl
             .get(getAuthorizationCodeKey(authorizationCode))
     }
 
+    fun saveGoogleAccessToken(googleAccessTokenRedis: GoogleAccessTokenRedis): Mono<Boolean> {
+        return this.googleAccessTokenRedisReactiveRedisTemplate.opsForValue()
+            .set(getGoogleAccessTokenKey(googleAccessTokenRedis.accountId), googleAccessTokenRedis, Duration.ofSeconds(googleAccessTokenRedis.expiresIn))
+    }
+
+    fun getGoogleAccessToken(accountId: Long): Mono<GoogleAccessTokenRedis> {
+        return this.googleAccessTokenRedisReactiveRedisTemplate.opsForValue().get(getGoogleAccessTokenKey(accountId))
+    }
 
     companion object {
         private const val ACCESS_TOKEN_PREFIX = "accessToken"
         private const val CLIENT_ID_METHOD_ACCOUNT_ID_PREFIX = "clientIdMethodAccountId"
         private const val REFRESH_TOKEN_PREFIX = "refreshToken"
         private const val AUTHORIZATION_CODE = "authorizationCode"
+        private const val ACCOUNT_ID_TO_GOOGLE_ACCESS_TOKEN = "accountIdToGoogleAccessToken"
 
         fun getAccessTokenKey(accessTokenValue: String): String {
             return "${ACCESS_TOKEN_PREFIX}_${accessTokenValue}"
@@ -90,6 +101,10 @@ class OAuthRedisRepository(private val reactiveRedisTemplate: ReactiveRedisTempl
 
         fun getAuthorizationCodeKey(authorizationCode: String): String {
             return "${AUTHORIZATION_CODE}_${authorizationCode}"
+        }
+
+        fun getGoogleAccessTokenKey(accountId: Long): String {
+            return "${ACCOUNT_ID_TO_GOOGLE_ACCESS_TOKEN}_${accountId}"
         }
     }
 }

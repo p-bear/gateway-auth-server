@@ -1,2 +1,6 @@
 server:
   port: 40000
+
+google:
+  api:
+    url: https://www.googleapis.com

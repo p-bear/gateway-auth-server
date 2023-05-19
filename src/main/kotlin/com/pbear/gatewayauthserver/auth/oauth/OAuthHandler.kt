@@ -1,19 +1,29 @@
 package com.pbear.gatewayauthserver.auth.oauth
 
 import com.nimbusds.common.contenttype.ContentType
+import com.nimbusds.jwt.JWTClaimsSet
+import com.nimbusds.jwt.JWTParser
 import com.nimbusds.oauth2.sdk.*
 import com.nimbusds.oauth2.sdk.auth.ClientAuthentication
 import com.nimbusds.oauth2.sdk.http.HTTPRequest
-import com.nimbusds.oauth2.sdk.token.AccessTokenType
+import com.nimbusds.oauth2.sdk.id.State
+import com.nimbusds.oauth2.sdk.token.BearerAccessToken
+import com.nimbusds.oauth2.sdk.token.Tokens
 import com.nimbusds.oauth2.sdk.util.URLUtils
 import com.nimbusds.oauth2.sdk.util.X509CertificateUtils
 import com.pbear.gatewayauthserver.auth.client.ClientAuthenticationVerifierEncodeSupport
 import com.pbear.gatewayauthserver.auth.client.ClientHandler
+import com.pbear.gatewayauthserver.auth.oauth.third.GoogleAuthService
+import com.pbear.gatewayauthserver.auth.oauth.third.ReqMainPostAccountGoogle
+import com.pbear.gatewayauthserver.auth.oauth.third.ReqPostOAuthTokenGoogle
+import com.pbear.gatewayauthserver.auth.oauth.third.ResGooglePostOauthToken
 import com.pbear.gatewayauthserver.common.WebClientService
+import com.pbear.gatewayauthserver.common.config.CustomUserDetail
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
+import org.springframework.security.core.context.ReactiveSecurityContextHolder
 import org.springframework.stereotype.Component
 import org.springframework.util.LinkedMultiValueMap
 import org.springframework.util.MultiValueMap
@@ -35,7 +45,8 @@ class OAuthHandler(
     private val webClientService: WebClientService,
     private val oAuthRedisRepository: OAuthRedisRepository,
     private val clientHandler: ClientHandler,
-    private val tokenStore: TokenStore
+    private val tokenStore: TokenStore,
+    private val googleAuthService: GoogleAuthService
 ) {
     private val log = KotlinLogging.logger {  }
 
@@ -65,6 +76,19 @@ class OAuthHandler(
                 }
             }
     }
+
+    fun handlePostOAuthTokenGoogle(serverRequest: ServerRequest): Mono<ServerResponse> {
+        return serverRequest.bodyToMono(ReqPostOAuthTokenGoogle::class.java)
+            .flatMap {
+                this.googleAuthService.getMainGoogleAuthInfo(it.code)
+                    .onErrorMap { throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "google auth fail") }
+            }
+            .zipWhen { ReactiveSecurityContextHolder.getContext()
+                .map { (it.authentication.credentials as CustomUserDetail).getAccessTokenRedis() }}
+            .flatMap { this.upgradeAccessTokenWithGoogle(it.t1, it.t2) }
+            .flatMap { ServerResponse.ok().bodyValue(AccessTokenResponse.parse(it.toJSONObject()).toJSONObject()) }
+    }
+
 
     private fun handleAuthorizeCode(httpRequest: HTTPRequest, authorizationRequest: AuthorizationRequest): Mono<ServerResponse> {
         val clientAuthentication = ClientAuthentication.parse(httpRequest)
@@ -145,16 +169,12 @@ class OAuthHandler(
                     (it.t1["id"] as Int).toLong())
             }
             .map {
-                val redirectParameter = mutableMapOf(
-                    "access_token" to mutableListOf(it.t2.value),
-                    "token_type" to mutableListOf(AccessTokenType.BEARER.value),
-                    "accountId" to mutableListOf(it.t2.accountId.toString())
-                )
-                if (authorizationRequest.state?.value != null) {
-                    redirectParameter["state"] = mutableListOf(authorizationRequest.state.value)
-                }
-
-                AuthorizationSuccessResponse.parse(URI(it.t1.t2.redirectUri), redirectParameter)
+                AuthorizationSuccessResponse(
+                    URI(it.t1.t2.redirectUri),
+                    null,
+                    BearerAccessToken(it.t2.value),
+                    State.parse(authorizationRequest.state.value),
+                    ResponseMode.QUERY)
             }
             .flatMap {
                 ServerResponse
@@ -162,6 +182,27 @@ class OAuthHandler(
                     .header(HttpHeaders.LOCATION, it.toURI().toString())
                     .build()
             }
+    }
+
+    private fun upgradeAccessTokenWithGoogle(resGooglePostOauthToken: ResGooglePostOauthToken, accessTokenRedis: AccessTokenRedis): Mono<Tokens> {
+
+        val jWTClaimsSet = this.extractJwtIdTokenPayload(resGooglePostOauthToken.id_token)
+        return this.webClientService.getAccountGoogle(jWTClaimsSet.subject)
+            .onErrorResume { _ ->
+                log.info("google account not linked >> add google account to accountId: ${accessTokenRedis.accountId}")
+                this.webClientService.postAccountGoogle(ReqMainPostAccountGoogle(
+                    jWTClaimsSet.subject,
+                    accessTokenRedis.accountId,
+                    jWTClaimsSet.getStringClaim("email"),
+                    jWTClaimsSet.getStringClaim("name"),
+                    jWTClaimsSet.getStringClaim("given_name"),
+                    jWTClaimsSet.getBooleanClaim("email_verified"),
+                    resGooglePostOauthToken.scope,
+                    resGooglePostOauthToken.refresh_token ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "google refreshToken required")))
+                    .onErrorMap { throw ResponseStatusException(HttpStatus.BAD_REQUEST, "google linked already") }
+            }
+            .flatMap { this.tokenService.upgradeAccessToken(accessTokenRedis, resGooglePostOauthToken) }
+            .map { this.tokenService.mapToTokens(accessTokenRedis.value, accessTokenRedis.issueTime, accessTokenRedis.accessTokenValidity, accessTokenRedis.scopes, accessTokenRedis.refreshToken) }
     }
 
     private fun <T> mapToHTTPRequest(serverRequest: ServerRequest, formData: MultiValueMap<String, String>?, body: T?): HTTPRequest {
@@ -235,4 +276,7 @@ class OAuthHandler(
         }
     }
 
+    private fun extractJwtIdTokenPayload(jwt: String): JWTClaimsSet {
+        return JWTParser.parse(jwt).jwtClaimsSet
+    }
 }
