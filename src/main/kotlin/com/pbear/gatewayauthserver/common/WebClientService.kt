@@ -39,14 +39,14 @@ class WebClientService(private val webClient: WebClient) {
             }
     }
 
-    fun getAccountGoogle(googleId: String): Mono<ResMainGetAccountGoogle> {
+    fun getAccountGoogle(accountId: Long): Mono<ResMainGetAccountGoogle> {
         return this.webClient.mutate()
             .baseUrl(this.mainServerBaseurl)
             .build()
             .get()
             .uri(UriComponentsBuilder.fromUriString(this.mainServerBaseurl)
                 .path("/api/account/google")
-                .queryParam("googleId", googleId)
+                .queryParam("accountId", accountId)
                 .build()
                 .toUri())
             .retrieve()

@@ -187,7 +187,7 @@ class OAuthHandler(
     private fun upgradeAccessTokenWithGoogle(resGooglePostOauthToken: ResGooglePostOauthToken, accessTokenRedis: AccessTokenRedis): Mono<Tokens> {
 
         val jWTClaimsSet = this.extractJwtIdTokenPayload(resGooglePostOauthToken.id_token)
-        return this.webClientService.getAccountGoogle(jWTClaimsSet.subject)
+        return this.webClientService.getAccountGoogle(accessTokenRedis.accountId)
             .onErrorResume { _ ->
                 log.info("google account not linked >> add google account to accountId: ${accessTokenRedis.accountId}")
                 this.webClientService.postAccountGoogle(ReqMainPostAccountGoogle(
@@ -200,6 +200,11 @@ class OAuthHandler(
                     resGooglePostOauthToken.scope,
                     resGooglePostOauthToken.refresh_token ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "google refreshToken required")))
                     .onErrorMap { throw ResponseStatusException(HttpStatus.BAD_REQUEST, "google linked already") }
+            }
+            .doOnNext {
+                if (!jWTClaimsSet.subject.equals(it.data.googleId)) {
+                    throw ResponseStatusException(HttpStatus.BAD_REQUEST, "google account linked already, google email: ${jWTClaimsSet.getStringClaim("email")}")
+                }
             }
             .flatMap { this.tokenService.upgradeAccessToken(accessTokenRedis, resGooglePostOauthToken) }
             .map { this.tokenService.mapToTokens(accessTokenRedis.value, accessTokenRedis.issueTime, accessTokenRedis.accessTokenValidity, accessTokenRedis.scopes, accessTokenRedis.refreshToken) }
