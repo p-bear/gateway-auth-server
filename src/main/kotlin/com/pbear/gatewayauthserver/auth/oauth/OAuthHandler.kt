@@ -163,7 +163,7 @@ class OAuthHandler(
                 }
             }
             .zipWhen {
-                this.tokenStore.createSaveAccessTokenRefreshToken(
+                this.tokenStore.createSaveAccessToken(
                     authorizationRequest.clientID.value,
                     authorizationRequest.customParameters["client_authentication_method"]!![0],
                     (it.t1["id"] as Int).toLong())

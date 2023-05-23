@@ -41,6 +41,12 @@ class TokenStore(
             }
     }
 
+    fun createSaveAccessToken(clientId: String, clientAuthenticationMethod: String, accountId: Long): Mono<AccessTokenRedis> {
+        return this.clientHandler.getClient(clientId, clientAuthenticationMethod)
+            .map { this.createAccessToken(UUID.randomUUID().toString(), "none", it, accountId) }
+            .flatMap { this.saveAccessToken(it) }
+    }
+
     fun createSaveAccessTokenRefreshToken(clientId: String, clientAuthenticationMethod: String, accountId: Long): Mono<AccessTokenRedis> {
         return this.clientHandler.getClient(clientId, clientAuthenticationMethod)
             .zipWhen { clientDetails ->
