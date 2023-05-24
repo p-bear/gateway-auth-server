@@ -90,19 +90,22 @@ class OAuthHandler(
     fun handleGetOAuthTokenGoogle(serverRequest: ServerRequest): Mono<ServerResponse> {
         return ReactiveSecurityContextHolder.getContext()
             .map { (it.authentication.credentials as CustomUserDetail).getAccessTokenRedis() }
-            .flatMap { accessTokenRedis ->
-                this.tokenStore.getGoogleAccessToken(accessTokenRedis.accountId)
-                    .switchIfEmpty {
-                        this.webClientService.getAccountGoogle(accessTokenRedis.accountId)
-                            .onErrorMap { throw GoogleAuthException(HttpStatus.UNAUTHORIZED, "No Google Account Linked", "1") }
-                            .flatMap { resMainAccountGoogle ->
-                                this.googleAuthService
-                                    .refreshGoogleToken(resMainAccountGoogle.data.refreshToken)
-                                    .flatMap { this.tokenService.upgradeAccessToken(accessTokenRedis, it.access_token, it.scope, it.expires_in.toLong()) }
-                            }
+            .flatMap(this::getGoogleToken)
+            .flatMap { ServerResponse.ok().bodyValue(it) }
+    }
+
+
+    fun getGoogleToken(accessTokenRedis: AccessTokenRedis): Mono<GoogleAccessTokenRedis> {
+        return this.tokenStore.getGoogleAccessToken(accessTokenRedis.accountId)
+            .switchIfEmpty {
+                this.webClientService.getAccountGoogle(accessTokenRedis.accountId)
+                    .onErrorMap { throw GoogleAuthException(HttpStatus.UNAUTHORIZED, "No Google Account Linked", "1") }
+                    .flatMap { resMainAccountGoogle ->
+                        this.googleAuthService
+                            .refreshGoogleToken(resMainAccountGoogle.data.refreshToken)
+                            .flatMap { this.tokenService.upgradeAccessToken(accessTokenRedis, it.access_token, it.scope, it.expires_in.toLong()) }
                     }
             }
-            .flatMap { ServerResponse.ok().bodyValue(it) }
     }
 
 

@@ -1,6 +1,7 @@
 package com.pbear.gatewayauthserver.proxy
 
-import com.pbear.gatewayauthserver.auth.filter.ApiAccessControlFilter
+import com.pbear.gatewayauthserver.proxy.filter.AccountApplyFilter
+import com.pbear.gatewayauthserver.proxy.filter.ApiAccessControlFilter
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.cloud.gateway.route.RouteLocator
@@ -9,7 +10,10 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 
 @Configuration
-class ProxyRouter(private val apiAccessControlFilter: ApiAccessControlFilter) {
+class ProxyRouter(
+    private val apiAccessControlFilter: ApiAccessControlFilter,
+    private val accountApplyFilter: AccountApplyFilter
+) {
     private val log = KotlinLogging.logger {  }
 
     @Value("\${route.main.url}")
@@ -20,11 +24,13 @@ class ProxyRouter(private val apiAccessControlFilter: ApiAccessControlFilter) {
         .route("main") { predicateSpec ->
             predicateSpec
                 .path("/main/**")
-                .filters { it
-                    .filter(apiAccessControlFilter.apply(ApiAccessControlFilter.Config()))
-                    .rewritePath("^/main", "")
+                .filters { gatewayFilterSpec ->
+                    gatewayFilterSpec
+                        .filter(this.accountApplyFilter.apply(AccountApplyFilter.Config()))
+                        .filter(this.apiAccessControlFilter.apply(ApiAccessControlFilter.Config()))
+                        .rewritePath("^/main", "")
                 }
-                .uri(mainRouteUrl)
+                .uri(this.mainRouteUrl)
         }
         .build()
 }

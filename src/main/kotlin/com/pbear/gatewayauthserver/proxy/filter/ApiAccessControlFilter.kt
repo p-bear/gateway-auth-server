@@ -1,4 +1,4 @@
-package com.pbear.gatewayauthserver.auth.filter
+package com.pbear.gatewayauthserver.proxy.filter
 
 import mu.KotlinLogging
 import org.springframework.cloud.gateway.filter.GatewayFilter
