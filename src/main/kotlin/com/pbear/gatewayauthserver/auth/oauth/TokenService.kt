@@ -98,12 +98,11 @@ class TokenService(private val tokenStore: TokenStore,
             RefreshToken(refreshTokenValue))
     }
 
-    fun upgradeAccessToken(accessTokenRedis: AccessTokenRedis, resGooglePostOauthToken: ResGooglePostOauthToken): Mono<GoogleAccessTokenRedis> {
+    fun upgradeAccessToken(accessTokenRedis: AccessTokenRedis, googleAccessToken: String, googleScope: String, googleExpiredIn: Long): Mono<GoogleAccessTokenRedis> {
         return this.tokenStore.saveGoogleAccessToken(
-            resGooglePostOauthToken.access_token,
-            resGooglePostOauthToken.id_token,
-            resGooglePostOauthToken.scope,
-            resGooglePostOauthToken.expires_in.toLong(),
+            googleAccessToken,
+            googleScope,
+            googleExpiredIn,
             accessTokenRedis.accountId,
             accessTokenRedis.clientId,
             accessTokenRedis.clientAuthenticationMethod)

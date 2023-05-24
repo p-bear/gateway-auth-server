@@ -18,6 +18,14 @@ data class ResGooglePostOauthToken(
 )
 
 @NoArg
+data class ResGooglePostOauthRefreshToken(
+    val access_token: String,
+    val expires_in: Int,
+    val scope: String,
+    val token_type: String
+)
+
+@NoArg
 data class ResMainGetAccountGoogle(
     val result: String,
     val data: ResMainGetAccountGoogleData
@@ -30,7 +38,8 @@ data class ResMainGetAccountGoogleData(
     val email: String,
     val name: String,
     val givenName: String,
-    val verifiedEmail: Boolean
+    val verifiedEmail: Boolean,
+    val refreshToken: String
 )
 
 @NoArg

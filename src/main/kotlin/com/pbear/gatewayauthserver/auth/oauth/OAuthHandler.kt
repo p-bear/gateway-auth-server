@@ -13,10 +13,7 @@ import com.nimbusds.oauth2.sdk.util.URLUtils
 import com.nimbusds.oauth2.sdk.util.X509CertificateUtils
 import com.pbear.gatewayauthserver.auth.client.ClientAuthenticationVerifierEncodeSupport
 import com.pbear.gatewayauthserver.auth.client.ClientHandler
-import com.pbear.gatewayauthserver.auth.oauth.third.GoogleAuthService
-import com.pbear.gatewayauthserver.auth.oauth.third.ReqMainPostAccountGoogle
-import com.pbear.gatewayauthserver.auth.oauth.third.ReqPostOAuthTokenGoogle
-import com.pbear.gatewayauthserver.auth.oauth.third.ResGooglePostOauthToken
+import com.pbear.gatewayauthserver.auth.oauth.third.*
 import com.pbear.gatewayauthserver.common.WebClientService
 import com.pbear.gatewayauthserver.common.config.CustomUserDetail
 import mu.KotlinLogging
@@ -31,6 +28,7 @@ import org.springframework.web.reactive.function.server.ServerRequest
 import org.springframework.web.reactive.function.server.ServerResponse
 import org.springframework.web.server.ResponseStatusException
 import reactor.core.publisher.Mono
+import reactor.kotlin.core.publisher.switchIfEmpty
 import java.net.URI
 import java.net.URL
 import java.security.cert.X509Certificate
@@ -87,6 +85,24 @@ class OAuthHandler(
                 .map { (it.authentication.credentials as CustomUserDetail).getAccessTokenRedis() }}
             .flatMap { this.upgradeAccessTokenWithGoogle(it.t1, it.t2) }
             .flatMap { ServerResponse.ok().bodyValue(AccessTokenResponse.parse(it.toJSONObject()).toJSONObject()) }
+    }
+
+    fun handleGetOAuthTokenGoogle(serverRequest: ServerRequest): Mono<ServerResponse> {
+        return ReactiveSecurityContextHolder.getContext()
+            .map { (it.authentication.credentials as CustomUserDetail).getAccessTokenRedis() }
+            .flatMap { accessTokenRedis ->
+                this.tokenStore.getGoogleAccessToken(accessTokenRedis.accountId)
+                    .switchIfEmpty {
+                        this.webClientService.getAccountGoogle(accessTokenRedis.accountId)
+                            .onErrorMap { throw GoogleAuthException(HttpStatus.UNAUTHORIZED, "No Google Account Linked", "1") }
+                            .flatMap { resMainAccountGoogle ->
+                                this.googleAuthService
+                                    .refreshGoogleToken(resMainAccountGoogle.data.refreshToken)
+                                    .flatMap { this.tokenService.upgradeAccessToken(accessTokenRedis, it.access_token, it.scope, it.expires_in.toLong()) }
+                            }
+                    }
+            }
+            .flatMap { ServerResponse.ok().bodyValue(it) }
     }
 
 
@@ -206,7 +222,7 @@ class OAuthHandler(
                     throw ResponseStatusException(HttpStatus.BAD_REQUEST, "google account linked already, google email: ${jWTClaimsSet.getStringClaim("email")}")
                 }
             }
-            .flatMap { this.tokenService.upgradeAccessToken(accessTokenRedis, resGooglePostOauthToken) }
+            .flatMap { this.tokenService.upgradeAccessToken(accessTokenRedis, resGooglePostOauthToken.access_token, resGooglePostOauthToken.scope, resGooglePostOauthToken.expires_in.toLong()) }
             .map { this.tokenService.mapToTokens(accessTokenRedis.value, accessTokenRedis.issueTime, accessTokenRedis.accessTokenValidity, accessTokenRedis.scopes, accessTokenRedis.refreshToken) }
     }
 

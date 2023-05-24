@@ -18,5 +18,8 @@ class GoogleAuthService(private val webClientService: WebClientService) {
         return this.webClientService.postGoogleOauth2V4Token(code, mainClientId, mainClientSecret, mainRedirectUri)
     }
 
+    fun refreshGoogleToken(googleRefreshTokenValue: String): Mono<ResGooglePostOauthRefreshToken> {
+        return this.webClientService.postGoogleRefreshToken(googleRefreshTokenValue, this.mainClientId, this.mainClientSecret)
+    }
 
 }

@@ -33,7 +33,6 @@ data class AccessTokenRedis(
 @NoArg
 data class GoogleAccessTokenRedis(
     val accessToken: String,
-    val idToken: String,
     val scope: String,
     val accountId: Long,
     val clientId: String,

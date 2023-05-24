@@ -2,6 +2,7 @@ package com.pbear.gatewayauthserver.common
 
 import com.nimbusds.oauth2.sdk.GrantType
 import com.pbear.gatewayauthserver.auth.oauth.third.ReqMainPostAccountGoogle
+import com.pbear.gatewayauthserver.auth.oauth.third.ResGooglePostOauthRefreshToken
 import com.pbear.gatewayauthserver.auth.oauth.third.ResGooglePostOauthToken
 import com.pbear.gatewayauthserver.auth.oauth.third.ResMainGetAccountGoogle
 import org.springframework.beans.factory.annotation.Value
@@ -79,5 +80,21 @@ class WebClientService(private val webClient: WebClient) {
                 .with("grant_type", GrantType.AUTHORIZATION_CODE.value))
             .retrieve()
             .bodyToMono(ResGooglePostOauthToken::class.java)
+    }
+
+    fun postGoogleRefreshToken(googleRefreshToken: String, googleClientId: String, googleClientSecret: String): Mono<ResGooglePostOauthRefreshToken> {
+        return this.webClient.mutate()
+            .baseUrl(this.googleApiServerBaseurl)
+            .build()
+            .post()
+            .uri("/oauth2/v4/token")
+            .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_FORM_URLENCODED_VALUE)
+            .body(BodyInserters
+                .fromFormData("refresh_token", googleRefreshToken)
+                .with("client_id", googleClientId)
+                .with("client_secret", googleClientSecret)
+                .with("grant_type", GrantType.REFRESH_TOKEN.value))
+            .retrieve()
+            .bodyToMono(ResGooglePostOauthRefreshToken::class.java)
     }
 }

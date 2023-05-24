@@ -122,11 +122,10 @@ class TokenStore(
         return this.oAuthRedisRepository.deleteRefreshToken(refreshTokenRedis.value)
     }
 
-    fun saveGoogleAccessToken(accessTokenValue: String, idToken: String, scope: String, expiresIn: Long,
-                              accountId: Long, clientId: String, clientAuthenticationMethod: String, ): Mono<GoogleAccessTokenRedis> {
+    fun saveGoogleAccessToken(accessTokenValue: String, scope: String, expiresIn: Long,
+                              accountId: Long, clientId: String, clientAuthenticationMethod: String): Mono<GoogleAccessTokenRedis> {
         val googleAccessTokenRedis = GoogleAccessTokenRedis(
             accessToken = accessTokenValue,
-            idToken = idToken,
             scope = scope,
             accountId = accountId,
             clientId = clientId,
@@ -140,5 +139,9 @@ class TokenStore(
                 }
                 sink.next(googleAccessTokenRedis)
             }
+    }
+
+    fun getGoogleAccessToken(accountId: Long): Mono<GoogleAccessTokenRedis> {
+        return this.oAuthRedisRepository.getGoogleAccessToken(accountId)
     }
 }

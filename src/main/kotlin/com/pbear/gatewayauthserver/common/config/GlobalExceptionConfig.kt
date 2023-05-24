@@ -2,6 +2,7 @@ package com.pbear.gatewayauthserver.common.config
 
 import com.nimbusds.oauth2.sdk.GeneralException
 import com.nimbusds.oauth2.sdk.auth.verifier.InvalidClientException
+import com.pbear.gatewayauthserver.auth.oauth.third.GoogleAuthException
 import com.pbear.gatewayauthserver.common.data.exception.ResponseErrorCode
 import org.springframework.boot.autoconfigure.web.WebProperties.Resources
 import org.springframework.boot.autoconfigure.web.reactive.error.AbstractErrorWebExceptionHandler
@@ -47,6 +48,7 @@ class GlobalExceptionConfig(
 
     fun createErrorResponseBody(throwable: Throwable, path: String) =
         when (throwable) {
+            is GoogleAuthException -> this.createErrorResponseBody("google.${throwable.code}", throwable.message, path)
             is ResponseStatusException -> this.createErrorResponseBody("common.${throwable.rawStatusCode}", throwable.message, path)
             is GeneralException -> this.createErrorResponseBody("oauth.common", throwable.message ?: "", path)
             else -> this.createErrorResponseBody(ResponseErrorCode.COMMON_1, null, path)
