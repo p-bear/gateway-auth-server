@@ -1,6 +1,7 @@
 package com.pbear.gatewayauthserver.proxy
 
 import com.pbear.gatewayauthserver.proxy.filter.AccountApplyFilter
+import com.pbear.gatewayauthserver.proxy.filter.GoogleAccountApplyFilter
 import com.pbear.gatewayauthserver.proxy.filter.ApiAccessControlFilter
 import mu.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
@@ -12,7 +13,8 @@ import org.springframework.context.annotation.Configuration
 @Configuration
 class ProxyRouter(
     private val apiAccessControlFilter: ApiAccessControlFilter,
-    private val accountApplyFilter: AccountApplyFilter
+    private val accountApplyFilter: AccountApplyFilter,
+    private val googleAccountApplyFilter: GoogleAccountApplyFilter
 ) {
     private val log = KotlinLogging.logger {  }
 
@@ -27,6 +29,7 @@ class ProxyRouter(
                 .filters { gatewayFilterSpec ->
                     gatewayFilterSpec
                         .filter(this.accountApplyFilter.apply(AccountApplyFilter.Config()))
+                        .filter(this.googleAccountApplyFilter.apply(GoogleAccountApplyFilter.Config()))
                         .filter(this.apiAccessControlFilter.apply(ApiAccessControlFilter.Config()))
                         .rewritePath("^/main", "")
                 }
