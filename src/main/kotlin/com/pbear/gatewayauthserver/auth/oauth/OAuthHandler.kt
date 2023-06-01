@@ -78,7 +78,7 @@ class OAuthHandler(
     fun handlePostOAuthTokenGoogle(serverRequest: ServerRequest): Mono<ServerResponse> {
         return serverRequest.bodyToMono(ReqPostOAuthTokenGoogle::class.java)
             .flatMap {
-                this.googleAuthService.getMainGoogleAuthInfo(it.code)
+                this.googleAuthService.getMainGoogleAuthInfo(it.code, it.redirectUri)
                     .onErrorMap { throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "google auth fail") }
             }
             .zipWhen { ReactiveSecurityContextHolder.getContext()

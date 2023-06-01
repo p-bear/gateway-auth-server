@@ -4,7 +4,8 @@ import com.pbear.gatewayauthserver.common.config.NoArg
 
 @NoArg
 data class ReqPostOAuthTokenGoogle(
-    val code: String
+    val code: String,
+    val redirectUri: String?
 )
 
 @NoArg

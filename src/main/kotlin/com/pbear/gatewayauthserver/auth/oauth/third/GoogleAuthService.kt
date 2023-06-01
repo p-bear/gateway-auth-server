@@ -14,8 +14,8 @@ class GoogleAuthService(private val webClientService: WebClientService) {
     @Value("\${google.main.redirectUri}")
     val mainRedirectUri = ""
 
-    fun getMainGoogleAuthInfo(code: String): Mono<ResGooglePostOauthToken> {
-        return this.webClientService.postGoogleOauth2V4Token(code, mainClientId, mainClientSecret, mainRedirectUri)
+    fun getMainGoogleAuthInfo(code: String, redirectUri: String?): Mono<ResGooglePostOauthToken> {
+        return this.webClientService.postGoogleOauth2V4Token(code, mainClientId, mainClientSecret, redirectUri ?: mainRedirectUri)
     }
 
     fun refreshGoogleToken(googleRefreshTokenValue: String): Mono<ResGooglePostOauthRefreshToken> {
