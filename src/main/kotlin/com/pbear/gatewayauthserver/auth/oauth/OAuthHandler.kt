@@ -99,11 +99,17 @@ class OAuthHandler(
         return this.tokenStore.getGoogleAccessToken(accessTokenRedis.accountId)
             .switchIfEmpty {
                 this.webClientService.getAccountGoogle(accessTokenRedis.accountId)
-                    .onErrorMap { throw GoogleAuthException(HttpStatus.UNAUTHORIZED, "No Google Account Linked", "1") }
+                    .onErrorMap { GoogleAuthException(HttpStatus.UNAUTHORIZED, "No Google Account Linked", "1") }
                     .flatMap { resMainAccountGoogle ->
                         this.googleAuthService
                             .refreshGoogleToken(resMainAccountGoogle.data.refreshToken)
-                            .flatMap { this.tokenService.upgradeAccessToken(accessTokenRedis, it.access_token, it.scope, it.expires_in.toLong()) }
+                            .onErrorResume {
+                                this.webClientService.deleteAccountGoogle(accessTokenRedis.accountId)
+                                    .map { throw GoogleAuthException(HttpStatus.UNAUTHORIZED, "Invalid Google RefreshToken", "2") }
+                            }
+                            .flatMap {
+                                this.tokenService.upgradeAccessToken(accessTokenRedis, it.access_token, it.scope, it.expires_in.toLong())
+                            }
                     }
             }
     }

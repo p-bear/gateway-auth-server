@@ -54,3 +54,9 @@ data class ReqMainPostAccountGoogle(
     val scope: String,
     val refreshToken: String
 )
+
+@NoArg
+data class ReqMainPutAccountGoogle(
+    val accountId: Long,
+    val refreshToken: String
+)

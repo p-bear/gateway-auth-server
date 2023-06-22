@@ -1,10 +1,7 @@
 package com.pbear.gatewayauthserver.common
 
 import com.nimbusds.oauth2.sdk.GrantType
-import com.pbear.gatewayauthserver.auth.oauth.third.ReqMainPostAccountGoogle
-import com.pbear.gatewayauthserver.auth.oauth.third.ResGooglePostOauthRefreshToken
-import com.pbear.gatewayauthserver.auth.oauth.third.ResGooglePostOauthToken
-import com.pbear.gatewayauthserver.auth.oauth.third.ResMainGetAccountGoogle
+import com.pbear.gatewayauthserver.auth.oauth.third.*
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
@@ -61,6 +58,31 @@ class WebClientService(private val webClient: WebClient) {
             .post()
             .uri("/api/account/google")
             .bodyValue(reqMainPostAccountGoogle)
+            .retrieve()
+            .bodyToMono(ResMainGetAccountGoogle::class.java)
+    }
+
+    fun deleteAccountGoogle(accountId: Long): Mono<HashMap<*, *>> {
+        return this.webClient.mutate()
+            .baseUrl(this.mainServerBaseurl)
+            .build()
+            .delete()
+            .uri(UriComponentsBuilder.fromUriString(this.mainServerBaseurl)
+                .path("/api/account/google")
+                .queryParam("accountId", accountId)
+                .build()
+                .toUri())
+            .retrieve()
+            .bodyToMono(HashMap::class.java)
+    }
+
+    fun putAccountGoogle(reqMainPutAccountGoogle: ReqMainPutAccountGoogle): Mono<ResMainGetAccountGoogle> {
+        return this.webClient.mutate()
+            .baseUrl(this.mainServerBaseurl)
+            .build()
+            .put()
+            .uri("/api/account/google")
+            .bodyValue(reqMainPutAccountGoogle)
             .retrieve()
             .bodyToMono(ResMainGetAccountGoogle::class.java)
     }
